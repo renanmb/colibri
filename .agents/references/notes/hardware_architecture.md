@@ -44,5 +44,23 @@ Crucial mount mappings:
    - Inside the container, `/models` directly accesses this 3.6 TB volume.
 2. **Container `/root/.cache/huggingface` $\leftrightarrow$ Host `/mnt/models_fast/hf_cache`**:
    - Hugging Face cache downloads are routed directly to the second NVMe drive.
-3. **Vulkan ICD:**
-   - Manifest at `/usr/share/vulkan/icd.d/nvidia_icd.json` points to `libGLX_nvidia.so.0`.
+3. **Vulkan Multi-GPU Pooling:**
+   - Primary Device (`GPU 0`): RTX PRO 6000 (Dense trunk 8.6 GiB + 3,888 expert slots in 82.3 GiB VRAM).
+   - Secondary Device (`GPU 1`): RTX 5090 (1,475 expert slots in 30.7 GiB VRAM via `COLI_VK_DEV2=auto`).
+   - Combined VRAM expert tier: **5,363 active experts in VRAM** (~113 GB VRAM total).
+
+---
+
+## Measured Inference Performance (GLM-5.3 744B Dual-GPU)
+
+Empirically measured via streaming completions (`stream: true`):
+
+| Metric | Short Prompt (10 tok) | Medium Prompt (50 tok) | Code Prompt (100 tok) |
+|---|---|---|---|
+| **Time To First Token (TTFT)** | **12.17 s** | **14.66 s** | **15.12 s** |
+| **Pure Generation Speed** | N/A (1 token) | **0.52 tok/s** (~1.92 s/tok) | **0.55 tok/s** (~1.81 s/tok) |
+| **GPU 0 Active Workload** | Routed experts | 10,886 experts | 12,036 experts |
+| **GPU 1 (RTX 5090) Workload** | Routed experts | 4,220 experts (1,610 batches) | 8,807 experts (3,081 batches) |
+| **Direct NVMe SSD Streaming** | ~3,200 loads | 12,956 expert loads | 23,257 expert loads |
+| **Total Response Latency** | 16.51 s | 70.77 s (30 tokens) | 67.55 s (30 tokens) |
+
