@@ -1,0 +1,71 @@
+{
+  "name": "Colibri Inference Engine & Agent Development",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "runArgs": [
+    "--gpus=all",
+    "--network=host",
+    "--ipc=host",
+    "--privileged",
+    "--pids-limit=4096",
+    "--ulimit", "memlock=-1",
+    "--ulimit", "stack=67108864",
+    "-e", "DISPLAY=${localEnv:DISPLAY}",
+    "-e", "NVIDIA_VISIBLE_DEVICES=all",
+    "-e", "NVIDIA_DRIVER_CAPABILITIES=all",
+    "-e", "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json",
+    "-v", "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+    "-v", "/mnt/models_fast/models:/models:rw",
+    "-v", "/mnt/models_fast/hf_cache:/root/.cache/huggingface:rw",
+    "-v", "/var/run/docker.sock:/var/run/docker.sock"
+  ],
+  "containerEnv": {
+    "COLI_MODEL_DIR": "/models",
+    "COLI_MODEL": "/models/glm53_i4",
+    "COLI_VULKAN": "1",
+    "COLI_VRAM_CACHE_MB": "105000",
+    "CTX": "65536",
+    "KV8": "1",
+    "OMP_NUM_THREADS": "16",
+    "OMP_WAIT_POLICY": "PASSIVE",
+    "__GL_SHADER_DISK_CACHE": "1",
+    "__GL_SHADER_DISK_CACHE_PATH": "/tmp",
+    "HF_HOME": "/root/.cache/huggingface"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "version": "latest",
+      "enableOnStartup": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "tamasfe.even-better-toml",
+        "redhat.vscode-yaml",
+        "eamodio.gitlens",
+        "GitHub.copilot",
+        "GitHub.copilot-chat"
+      ],
+      "settings": {
+        "remote.autoForwardPorts": false,
+        "remote.restoreForwardedPorts": false,
+        "python.defaultInterpreterPath": "/usr/bin/python3",
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "C_Cpp.default.cppStandard": "c++17",
+        "C_Cpp.default.cStandard": "c11"
+      }
+    }
+  },
+  "initializeCommand": "mkdir -p /mnt/models_fast/models /mnt/models_fast/hf_cache 2>/dev/null || true",
+  "postStartCommand": "echo 'Colibri Environment Ready.' && nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader && vulkaninfo --summary 2>/dev/null | grep -E 'apiVersion|deviceName' || true"
+}
