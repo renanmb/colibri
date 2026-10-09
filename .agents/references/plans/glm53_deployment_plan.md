@@ -40,7 +40,11 @@ This plan outlines the end-to-end execution path for downloading, verifying, tun
 - [x] Verified generation output: "Hello! How can I help you today?" generated cleanly with 60.1% expert hit rate on first cold pass.
 
 ### Phase 4: Production Serving (Completed)
-- [x] Started background server with `coli start --background --no-browser` on port 8000 (PID 27783).
+- [x] Started background server with `coli start --background --no-browser` on port 8000.
 - [x] Verified OpenAI API endpoints (`/v1/chat/completions`) and web dashboard (`http://127.0.0.1:8000/`).
 - [x] Model `glm-5.2-colibri` serving live with Vulkan GPU tiering on RTX PRO 6000 and direct NVMe storage streaming.
+- [x] Enabled dual-GPU expert pooling (`COLI_VK_DEV2=auto`): pooled RTX PRO 6000 (3,888 experts) + RTX 5090 (1,475 experts) for 5,363 resident VRAM experts (~113 GB VRAM).
+- [x] Measured empirical streaming benchmarks: TTFT 12.17s–15.12s, pure generation 0.52–0.55 tok/s.
+- [x] Configured Hermes Agent CLI integration and documented prompt tuning and BIOS optimizations in `.agents/references/notes/wrapup_performance_and_bios_tuning_guide.md`.
+
 
