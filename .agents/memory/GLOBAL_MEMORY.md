@@ -27,6 +27,11 @@
 ---
 
 ## 3. Active Goal & Decisions
-- **Target Model:** GLM-5.3 744B (`Justvugg/GLM-5.3-colibri-int4-g64`, 419.3 GB download).
+- **Target Model:** GLM-5.3 744B (`Justvugg/GLM-5.3-colibri-int4-g64`, 419.3 GB download, 141 shards on `/models/glm-5.3`).
 - **Container Format:** Group-scaled `int4-gs64` without MTP head.
-- **Second NVMe:** Formatted with ext4, `noatime,nodiratime`, tested at ~6.0 GB/s direct read.
+- **Second NVMe:** Formatted with ext4, `noatime,nodiratime`, tested at ~6.0-7.0 GB/s direct read.
+- **Production Server:** Running in background (PID 27783) on `http://127.0.0.1:8000/`.
+  - OpenAI API: `http://127.0.0.1:8000/v1` (Model ID: `glm-5.2-colibri`)
+  - Anthropic API: `http://127.0.0.1:8000`
+  - VRAM Expert Tier: 92.03 GiB (4,353 experts) resident on RTX PRO 6000 Blackwell.
+
