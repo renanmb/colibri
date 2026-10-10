@@ -19,17 +19,29 @@ cd "${REPO_ROOT}"
 echo "[Gaming Profile] Stopping any running server..."
 python3 c/coli stop 2>/dev/null || true
 
+echo "[Gaming Profile] Locking GPU clocks & setting persistence mode..."
+nvidia-smi -pm 1 >/dev/null 2>&1 || true
+nvidia-smi -lmc 14001,14001 >/dev/null 2>&1 || true
+nvidia-smi -lgc 2100,2850 >/dev/null 2>&1 || true
+
 echo "[Gaming Profile] Launching tuned Colibrì background server..."
 nice -n 12 env \
   RAM_GB=48 \
-  COLI_VK_TIER_RESERVE_GB=10.0 \
+  DIRECT=1 \
+  PIPE=1 \
+  PIPE_WORKERS=16 \
+  COLI_VK_STAGED=1 \
+  COLI_VK_TIER_GB=62.0 \
+  COLI_VK_TIER_RESERVE_GB=2.0 \
   COLI_VK_TIER_STREAM_SLOTS=16 \
   COLI_VK_TIER_STREAM_HALF=64 \
   COLI_VK_TIER_STREAM_ROWS=8 \
-  COLI_VK_CHAIN_ROWS=512 \
+  COLI_VK_CHAIN_ROWS=128 \
   OMP_NUM_THREADS=8 \
   COLI_KV_SHARE=1 \
   COLI_VK_DEV2=auto \
+  COLI_VK_EXPERTS2=1100 \
+  COLI_VK_RESERVE2_GB=6.0 \
   KV8=0 \
   python3 c/coli start --background --no-browser
 
