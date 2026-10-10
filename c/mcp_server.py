@@ -63,24 +63,17 @@ def _schema(properties=None, required=()):
 
 TOOLS = [
     {"name": "detect_hardware", "title": "Detect hardware",
-     "description": ("RAM (total and free), free disk where models go, CPU name and features, "
-                     "and GPUs: Vulkan devices with type and memory, NVIDIA cards via nvidia-smi."),
+     "description": "Report host RAM, free disk, CPU features, and Vulkan/NVIDIA GPUs.",
      "inputSchema": _schema({"target_dir": {"type": "string",
-                                            "description": "folder whose free space to report "
-                                                           "(default ~/colibri-models)"}})},
+                                            "description": "folder whose free space to report (default ~/colibri-models)"}})},
     {"name": "recommend_models", "title": "Recommend models",
-     "description": ("Every downloadable model against this machine: download size, RAM needed, "
-                     "whether it fits and why, with the recommended default marked."),
+     "description": "List downloadable models against this machine with hardware fit status.",
      "inputSchema": _schema({"target_dir": {"type": "string"},
                              "include_unfit": {"type": "boolean", "default": False}})},
     {"name": "install", "title": "Install a model",
-     "description": ("Build or fetch the engine (Vulkan/CUDA when a GPU is usable), download the "
-                     "model with resume, write the run configuration, and by default start the "
-                     "server in the background. Runs as a background job; returns at once unless "
-                     "wait_seconds is set. Calling it again resumes an interrupted install."),
+     "description": "Build engine, download model, write run configuration, and start server.",
      "inputSchema": _schema({
-         "model": {"type": "string", "description": "catalog id from recommend_models "
-                                                    "(default: the recommendation)"},
+         "model": {"type": "string", "description": "catalog id from recommend_models"},
          "target_dir": {"type": "string", "description": "folder for models"},
          "model_dir": {"type": "string", "description": "use a model already on disk"},
          "backend": {"type": "string", "enum": ["auto", "cpu", "vulkan", "cuda"]},
@@ -88,23 +81,19 @@ TOOLS = [
          "start": {"type": "boolean", "default": True},
          "wait_seconds": {"type": "integer", "minimum": 0, "maximum": 86400, "default": 0}})},
     {"name": "start", "title": "Start colibri",
-     "description": "Start the configured server in the background; returns its URLs.",
+     "description": "Start the configured server in background; returns URLs.",
      "inputSchema": _schema({"open_browser": {"type": "boolean", "default": False},
-                             "wait_seconds": {"type": "integer", "minimum": 0, "maximum": 7200,
-                                              "default": 0}})},
+                             "wait_seconds": {"type": "integer", "minimum": 0, "maximum": 7200, "default": 0}})},
     {"name": "stop", "title": "Stop colibri",
      "description": "Stop the configured server and its engine.",
      "inputSchema": _schema()},
     {"name": "status", "title": "Status",
-     "description": ("Configured model and engine, install progress, server state (stopped, "
-                     "loading, ready), browser/OpenAI/Anthropic URLs, tok/s of the last answer."),
+     "description": "Report configured model, engine, server state, URLs, and token speed.",
      "inputSchema": _schema()},
     {"name": "logs", "title": "Logs",
-     "description": "The last lines of the server, install or build log.",
-     "inputSchema": _schema({"which": {"type": "string", "enum": ["server", "install", "build"],
-                                       "default": "server"},
-                             "lines": {"type": "integer", "minimum": 1, "maximum": 5000,
-                                       "default": 100}})},
+     "description": "Tail the last lines of the server, install, or build log.",
+     "inputSchema": _schema({"which": {"type": "string", "enum": ["server", "install", "build"], "default": "server"},
+                             "lines": {"type": "integer", "minimum": 1, "maximum": 5000, "default": 100}})},
 ]
 
 

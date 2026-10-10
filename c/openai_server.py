@@ -3097,7 +3097,7 @@ def render_chat_glm53(messages, enable_thinking=False, reasoning_effort=None, to
     # nostra. `none` non arriva qui, spegne il ragionamento a monte per le famiglie
     # che possono davvero spegnerlo.
     effort = {"minimal": "Low", "low": "Low", "medium": "High",
-              "high": "High", "xhigh": "Max"}.get(reasoning_effort,
+              "high": "High", "xhigh": "Max", "max": "Max"}.get(reasoning_effort,
                                                   "Max" if enable_thinking else "Low")
     prompt.append(f"<|system|>Reasoning Effort: {effort}")
     if tools:
@@ -7739,9 +7739,9 @@ class APIHandler(BaseHTTPRequestHandler):
             raise APIError(400, "`strict_tool_calls` does not support `logprobs` yet.",
                            "logprobs", "unsupported_parameter")
         reasoning_effort = body.get("reasoning_effort")
-        efforts = (None, "none", "minimal", "low", "medium", "high", "xhigh")
+        efforts = (None, "none", "minimal", "low", "medium", "high", "xhigh", "max")
         if reasoning_effort not in efforts:
-            raise APIError(400, "`reasoning_effort` must be none, minimal, low, medium, high, or xhigh.",
+            raise APIError(400, "`reasoning_effort` must be none, minimal, low, medium, high, xhigh, or max.",
                            "reasoning_effort")
         # COLI_THINK=1 makes thinking the default when the client sends NEITHER reasoning_effort
         # nor enable_thinking (a global switch, like the old server's --think). An explicit
