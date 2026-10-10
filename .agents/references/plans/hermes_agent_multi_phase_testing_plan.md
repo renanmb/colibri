@@ -21,17 +21,29 @@ With the foundational engine architecture and hardware-tuned configuration estab
 ### Hardware & Engine Baseline (Post-Optimization)
 | Component / Knob | Target Setting | Purpose / Protection | Verification Check |
 |---|---|---|---|
-| **GPU 0 (RTX PRO 6000 96GB)** | 73.4 GiB VRAM Allocated, **24.4 GiB VRAM Free** | 2,960 resident experts + dense chain, guaranteed 24.4 GB 4K gaming/display buffer | `nvidia-smi` |
-| **GPU 1 (RTX 5090 32GB)** | 23.4 GiB VRAM Allocated, **8.6 GiB VRAM Free** | 1,100 resident experts (`COLI_VK_EXPERTS2=1100`, `COLI_VK_RESERVE2_GB=6.0`), safe BAR1 VA margin | `nvidia-smi` |
+| **GPU 0 (RTX PRO 6000 96GB)** | 70.3 GiB VRAM Allocated, **27.5 GiB VRAM Free** | 3,344 resident experts (`COLI_VK_TIER_GB=70.0`), guaranteed 27.5 GB 4K gaming/display buffer | `nvidia-smi` |
+| **GPU 1 (RTX 5090 32GB)** | 22.6 GiB VRAM Allocated, **9.9 GiB VRAM Free** | 1,100 resident experts (`COLI_VK_EXPERTS2=1100`, `COLI_VK_RESERVE2_GB=6.0`), safe BAR1 VA margin | `nvidia-smi` |
+| **Total Resident VRAM Experts** | **4,444 resident experts (94.36 GiB)** | 44.5% of GLM-5.3's 9,984 total experts held in ultra-fast GDDR VRAM | `curl /health` |
 | **GPU Clocks & Power State** | **P0 Locked**, Mem: **14,001 MHz**, Core: **2,100–2,850 MHz** | Zero downclocking jitter to P8 idle (405 MHz); constant 1.8 TB/s memory bandwidth | `nvidia-smi -q -d CLOCK` |
 | **Driver Persistence Mode** | `nvidia-smi -pm 1` | Prevents kernel module driver unload and clock decay between turns | `nvidia-smi` |
 | **Memory Allocation Mode** | `COLI_VK_STAGED=1` | Pure `DEVICE_LOCAL` VRAM allocation via DMA queues; eliminates BAR1 exhaustion | `serve.log` & `dmesg` |
-| **System Host RAM** | `RAM_GB=48` (≥40 GB free) | System OS, development tools, and game memory guarantee | `free -h` |
+| **System Host RAM & Expert Cache** | `RAM_GB=70` (≥21 GB free) | Expert cache cap doubled 8->17/layer, 1,048 hot experts pinned warm in RAM (22.3 GB) | `serve.log` / `free -h` |
+| **KV Cache Precision** | **`KV8=0` (Native FP32)** | Strictly required for Hermes: enables GPU 0 Vulkan dense chain; avoids 46.5m CPU stall | `serve.log` |
+| **Context Window Size** | `CTX=65536` | Full 64k token context window capacity supported with minimal memory consumption | `serve.log` |
 | **CPU Scheduling** | `OMP_NUM_THREADS=8`, `nice -n 12` | 8 dedicated physical cores free for game render loops and system tasks | `htop` / `top` |
 | **Storage Engine (I/O)** | `DIRECT=1`, `PIPE=1`, `PIPE_WORKERS=16` | `O_DIRECT` bypasses ext4 page cache double-copying; 16 async threads stream at 6.04 GB/s | `serve.log` / `vmstat` |
 | **Chain Dispatch Sizing** | `COLI_VK_CHAIN_ROWS=128`, slots: 16, scratch: 64 | Bounded forward dispatches; prevents Xorg display watchdog timeouts on GPU 0 | `serve.log` |
 | **Prefix Cache Sharing** | `COLI_KV_SHARE=1` | Multi-turn Radix KV cache prefix adoption (reusing >3,700 tokens across turns) | `serve.log` |
 | **Hermes Profile** | `vibe-gaming` | Calibrated reasoning (`low`), lean system prompt, tool definitions intact | `hermes -p vibe-gaming config` |
+
+### 2.2 Turnaround Time Strategy: Achieving 10–20s Response Times on Agent Workloads
+
+When operating autonomous agent frameworks like Hermes with large toolsets, initial generation latency is dominated by prompt prefill rather than token decoding. To achieve responsive 10–20 second response times during coding sessions, two pillars must be maintained:
+
+1. **Keep `KV8=0` (GPU Dense Chain Enabled):**
+   In [`scripts/start_gaming_profile.sh`](file:///workspaces/colibri/scripts/start_gaming_profile.sh), `KV8=0` is configured specifically so that all 78 layers of dense matrix multiplications and MLA attention stay on the RTX PRO 6000 Blackwell GPU (`[VK] colibri chain: 78 of 78 layers on the device`), speeding up prefill by an order of magnitude. In contrast, setting `KV8=1` disables the GPU dense chain in [`c/glm_chain.h` Line 722](file:///workspaces/colibri/c/glm_chain.h#L720-L723) and drops dense attention to the CPU, causing Turn 1 prefill to stall for 46.5 minutes.
+2. **KV Cache Prefix Reuse (`COLI_KV_SHARE=1`):**
+   Once the initial 3,757-token prompt (system instructions + 5 tool schemas) completes its prefill pass, the system prompt prefix is preserved in the engine's KV cache (`prefix 3759/3759 token, prefill 0`). Subsequent queries take only **10–20 seconds** because they skip prefilling the 3,757-token prefix entirely.
 
 ---
 
@@ -358,3 +370,20 @@ During live execution of Milestone 7 and Phase 1 testing, six fundamental system
   - *Cold Start Penalty:* The initial prompt incurs a cold prefill cost (streaming cold weights for 3,763 tokens). Knowing this duration allows setting realistic timeout thresholds.
   - *Warm Hit Acceleration:* Once the prompt prefix is cached, subsequent turns process prefill in <1.5s, making multi-turn pair programming highly responsive.
   - *Decode Throughput Feasibility:* Measuring decode tokens-per-second against resident VRAM experts establishes upper bounds on how many tokens an agent can produce in interactive coding scenarios.
+
+### Finding 7: The `KV8=0` vs `KV8=1` Architectural Trap (GPU Dense Chain Acceleration)
+* **Discovery & Empirical Benchmark:** During test execution of `vibe-gaming -z "What is 2+2?"`:
+  - *Under `KV8=1`:* Execution took **47 minutes and 17 seconds (2,790.63s prefill)** for a single turn.
+  - *Under `KV8=0`:* All 78 layers of dense matrix multiplications and MLA attention were placed directly on GPU 0 (`[VK] colibri chain: 78 of 78 layers on the device`), eliminating the CPU prefill freeze.
+* **Root Cause in [`c/glm_chain.h` Line 722](file:///workspaces/colibri/c/glm_chain.h#L720-L723):**
+  The engine's Vulkan shaders for attention (`vkchain`) only support native FP32 KV cache tensors. Passing `KV8=1` triggers:
+  ```text
+  [VK] colibri: a quantized KV cache (KV8, KV_TQ) stays on the CPU: the dense chain stays off
+  [VK] colibri: dense weights on the device and in host RAM (the dense part runs on the CPU)
+  ```
+  While short prompts (5–10 tokens in `./coli chat`) compute on the CPU instantaneously, Hermes Agent injects **3,757 tokens** of system instructions and 5 tool schemas on Turn 1. Computing attention across 78 layers on the CPU with 8 threads at `nice -n 12` took **35.8 seconds per layer $\times$ 78 layers = 2,790.63 seconds (46.5 minutes)**.
+* **Resolution & Operational Strategy:**
+  1. *Keep `KV8=0` for all Hermes agent workflows:* Ensures GPU 0 hardware acceleration for prompt prefill.
+  2. *Retain memory expansions:* Maintain `RAM_GB=70` (17 slots/layer host cache) and `COLI_VRAM_CACHE_MB=105000` (4,444 VRAM resident experts with 99.8% GPU hit rate).
+  3. *KV Cache Reuse:* Once the 3,757-token system prompt prefix is processed, subsequent queries reuse the prefix (`prefix 3759/3759 token, prefill 0`), executing in **10–20 seconds**.
+

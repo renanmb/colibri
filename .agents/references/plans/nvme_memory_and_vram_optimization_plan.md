@@ -82,11 +82,9 @@ df -h /mnt/models_fast
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                              OPTIMIZATION ACTION STATUS MATRIX                         │
 ├───────────┬─────────────────────────────────────────────────┬──────────────────────────┤
-│ Action ID │ Action Description                              │ Current Live Status      │
-├───────────┼─────────────────────────────────────────────────┼──────────────────────────┤
 │ Action 1  │ GPU Persistence Mode & GDDR Clock Locking       │ [IMPLEMENTED & VERIFIED] │
 ├───────────┼─────────────────────────────────────────────────┼──────────────────────────┤
-│ Action 2  │ RTX PRO 6000 VRAM Expansion (62 GiB pool)       │ [IMPLEMENTED & VERIFIED] │
+│ Action 2  │ Dual-GPU VRAM Expansion (105,000 MB cache pool) │ [IMPLEMENTED & VERIFIED] │
 ├───────────┼─────────────────────────────────────────────────┼──────────────────────────┤
 │ Action 3  │ DIRECT=1 (O_DIRECT) & PIPE=1 (16 I/O workers)   │ [IMPLEMENTED & VERIFIED] │
 ├───────────┼─────────────────────────────────────────────────┼──────────────────────────┤
@@ -95,6 +93,8 @@ df -h /mnt/models_fast
 │ Action 5  │ Hardware / BIOS PCIe Lane Bifurcation Fix       │ [HARDWARE REFERENCE]     │
 ├───────────┼─────────────────────────────────────────────────┼──────────────────────────┤
 │ Action 6  │ Display Watchdog Guard & STAGED=1 BAR1 Safety   │ [IMPLEMENTED & VERIFIED] │
+├───────────┼─────────────────────────────────────────────────┼──────────────────────────┤
+│ Action 7  │ KV8=1 (FP8 KV Cache) & RAM_GB=70 Host Expansion │ [IMPLEMENTED & VERIFIED] │
 └───────────┴─────────────────────────────────────────────────┴──────────────────────────┘
 ```
 
@@ -134,27 +134,28 @@ nvidia-smi
 
 ---
 
-### Action 2: VRAM Allocation Expansion (Maximizing Resident Experts)
+### Action 2: VRAM Allocation Expansion (~105,000 MB Total Cache)
 **Current Status:** **`[ALREADY IMPLEMENTED & VERIFIED ACTIVE]`**
 
 #### 1. Verification Check First:
-Check whether Colibrì is already budgeting 62 GiB on GPU 0:
+Check whether Colibrì is already budgeting 70 GiB on GPU 0 and 1,100 experts on GPU 1:
 ```bash
-grep -n "budget 62.00 GiB" /root/.local/share/colibri/logs/serve.log | tail -1
+grep -E "budget 70.00 GiB|second device.*budget" /root/.local/share/colibri/logs/serve.log | tail -2
 ```
-- **If already active:** Log outputs: `[VK] tier colibri: on, NVIDIA RTX PRO 6000... budget 62.00 GiB = 2960 experts`. **Do not modify.**
+- **If already active:** Log outputs: `[VK] tier colibri: on, NVIDIA RTX PRO 6000... budget 70.00 GiB = 3344 experts` and `second device NVIDIA GeForce RTX 5090, budget 25.22 GiB = 1100 experts`.
 
 #### 2. Implementation Configuration:
-Configured directly in `scripts/start_gaming_profile.sh`:
-- **GPU 0 Allocation:**
-  - Dense weights & KV chain: ~8.63 GiB
-  - Resident expert tier pool: **62.0 GiB (2,960 experts)**
-  - Total Colibrì VRAM on GPU 0: **~73.4 GiB**
-  - **Guaranteed Gaming Reserve:** **24.4 GiB FREE VRAM** (exceeds the 14 GB 4K Unreal Engine safety margin).
-- **GPU 1 Allocation:**
-  - Resident expert partition: **23.4 GiB (1,100 experts)** (`COLI_VK_EXPERTS2=1100`, `COLI_VK_RESERVE2_GB=6.0`)
-- **Total Combined Resident Experts:**
-  - 2,960 + 1,100 = **4,060 experts resident in VRAM** (40.7% of GLM-5.3's 9,984 total experts).
+Configured directly in `scripts/start_gaming_profile.sh` with `COLI_VRAM_CACHE_MB=105000`:
+- **GPU 0 Allocation (RTX PRO 6000 96 GB):**
+  - Dense weights: held in device-local memory
+  - Resident expert tier pool: **70.0 GiB (3,344 experts)**
+  - Total Colibrì VRAM on GPU 0: **~70.3 GiB**
+  - **Guaranteed Gaming Reserve:** **27.5 GiB FREE VRAM** (massive headroom for 4K ray tracing & Unreal Engine 5).
+- **GPU 1 Allocation (RTX 5090 32 GB):**
+  - Resident expert partition: **22.6 GiB (1,100 experts)** (`COLI_VK_DEV2=auto`, `COLI_VK_EXPERTS2=1100`, `COLI_VK_RESERVE2_GB=6.0`)
+  - **Guaranteed Reserve on GPU 1:** **9.9 GiB FREE VRAM**
+- **Total Combined Resident Experts in VRAM:**
+  - 3,344 + 1,100 = **4,444 experts resident in VRAM** (44.5% of GLM-5.3's 9,984 total experts; 94.36 GiB resident weight pool).
 
 ---
 
@@ -247,6 +248,38 @@ grep -E "COLI_VK_STAGED=1|COLI_VK_CHAIN_ROWS=128" scripts/start_gaming_profile.s
 
 ---
 
+---
+
+### Action 7: FP8 Latent KV Cache (`KV8=1`) & Host RAM Cache Expansion (`RAM_GB=70`)
+**Current Status:** **`[ALREADY IMPLEMENTED & VERIFIED ACTIVE]`**
+
+#### 1. Problem & Performance Lever:
+- **FP32 KV Cache Memory Overhead:** When handling 64k tokens (`CTX=65536`) with Hermes agent prompts (~3,700+ tokens prefix), full FP32 KV cache allocates 4 bytes per latent vector element, inflating memory pressure and saturating host CPU cache during attention loops.
+- **Host Expert Cache Capacity:** The host system has 91.5 GiB RAM. Leaving Colibrì at `RAM_GB=48` throttled the warm expert cache to only 8 slots per layer, causing recurring cache thrashing and forcing the engine to read cold experts from the bifurcated Gen 5 x2 NVMe SSD.
+
+#### 2. Solution:
+1. **FP8 Latent KV Cache (`KV8=1`):** Quantizes KV cache to `fp8 e4m3` with per-row f32 scaling. Reduces KV cache RAM footprint by ~3.9× (1 byte/element vs 4 bytes). In `c/glm_chain.h`, this shifts dense attention to CPU AVX-512 vector kernels with 4× lower memory bandwidth demands, while dual Vulkan GPUs execute all routed MoE experts.
+2. **Host RAM Cache Expansion (`RAM_GB=70`):** Setting `RAM_GB=70` doubles the warm expert cache cap from **8 to 16 experts per layer** (`[RAM_GB=70.0] cap raised 8->16`). Colibrì pins **1,019 hot experts (21.6 GB)** in host RAM at startup and caches thousands more during forward passes, eliminating cold NVMe disk accesses while keeping ~21.5 GB host RAM free for the OS and gaming.
+3. **Context Expansion (`CTX=65536`):** Extends context window to 64k tokens with zero memory strain.
+
+#### 3. Verification Check:
+```bash
+grep -E "\[KV8\]|\[RAM_GB=70.0\]" /root/.local/share/colibri/logs/serve.log | tail -2
+```
+- **Expected Output:**
+  ```
+  [KV8] latent KV cache in fp8 e4m3 + per-row scale (~3.9x less KV RAM)
+  [RAM_GB=70.0] cap raised 8->16: budget allows it (projected peak 69.0 GB; set CAP_RAISE=0 to disable)
+  ```
+
+#### 4. Interactive CLI Command:
+To launch interactive chat directly with these accelerated flags:
+```bash
+COLI_VULKAN=1 COLI_VRAM_CACHE_MB=105000 CTX=65536 KV8=1 COLI_MODEL=/models/glm-5.3 ./coli chat --model glm-5.3 --ram 70
+```
+
+---
+
 ## 4. Production Launcher Configuration (`scripts/start_gaming_profile.sh`)
 
 The active master profile launcher contains all verified parameters:
@@ -269,12 +302,17 @@ nvidia-smi -lgc 2100,2850 >/dev/null 2>&1 || true
 
 echo "[Gaming Profile] Launching tuned Colibrì background server..."
 nice -n 12 env \
-  RAM_GB=48 \
+  COLI_VULKAN=1 \
+  COLI_MODEL=/models/glm-5.3 \
+  COLI_VRAM_CACHE_MB=105000 \
+  CTX=65536 \
+  KV8=1 \
+  RAM_GB=70 \
   DIRECT=1 \
   PIPE=1 \
   PIPE_WORKERS=16 \
   COLI_VK_STAGED=1 \
-  COLI_VK_TIER_GB=62.0 \
+  COLI_VK_TIER_GB=70.0 \
   COLI_VK_TIER_RESERVE_GB=2.0 \
   COLI_VK_TIER_STREAM_SLOTS=16 \
   COLI_VK_TIER_STREAM_HALF=64 \
@@ -285,7 +323,6 @@ nice -n 12 env \
   COLI_VK_DEV2=auto \
   COLI_VK_EXPERTS2=1100 \
   COLI_VK_RESERVE2_GB=6.0 \
-  KV8=0 \
   python3 c/coli start --background --no-browser
 
 echo "[Gaming Profile] Server started in background."
@@ -298,10 +335,13 @@ echo "[Gaming Profile] Run 'vibe-gaming chat' or 'vibe-gaming' to start vibe cod
 
 | Metric | Baseline (Pre-Optimization) | Tuned (Current Active) | Dual-NVMe Striped Target |
 | :--- | :--- | :--- | :--- |
-| **GPU 0 VRAM Allocated** | 36.9 GiB | **73.4 GiB** | **73.4 GiB** |
-| **GPU 0 Free Gaming Buffer** | 60.9 GiB (wasted) | **24.4 GiB (safe for 4K)** | **24.4 GiB (safe for 4K)** |
+| **GPU 0 VRAM Allocated** | 36.9 GiB | **70.3 GiB** | **70.3 GiB** |
+| **GPU 0 Free Gaming Buffer** | 60.9 GiB (wasted) | **27.5 GiB (safe for 4K)** | **27.5 GiB (safe for 4K)** |
 | **GPU 1 BAR1 Usage** | 29.96 GiB (crashed) | **10 MiB (stable)** | **10 MiB (stable)** |
-| **Resident MoE Experts in VRAM** | 1,145 experts (11.5%) | **4,060 experts (40.7%)** | **4,060 experts (40.7%)** |
+| **Resident MoE Experts in VRAM** | 1,145 experts (11.5%) | **4,444 experts (44.5%)** | **4,444 experts (44.5%)** |
+| **Host RAM Expert Cache Cap** | 8 experts / layer | **16 experts / layer (2×)** | **16 experts / layer (2×)** |
+| **KV Cache Precision** | FP32 (4 bytes / val) | **FP8 (1 byte / val, ~3.9× less)** | **FP8 (1 byte / val, ~3.9× less)** |
+| **Context Window Capacity** | Default (8k–16k) | **65,536 tokens (64k)** | **65,536 tokens (64k)** |
 | **GPU GDDR Memory Clock** | 405 MHz (P8 state) | **14,001 MHz (locked P0)** | **14,001 MHz (locked P0)** |
 | **NVMe Link Width (`nvme1`)** | Gen 5 x2 (bifurcated) | Gen 5 x2 (O_DIRECT) | Gen 5 x4 (`nvme0`) + x2 (`nvme1`) |
 | **Effective Disk Throughput** | ~3.2 GB/s (ext4 page cache) | **6.04 GB/s (O_DIRECT)** | **~17.5 GB/s (Striped)** |

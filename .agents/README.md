@@ -13,6 +13,8 @@ This repository stores agent skills, architectural references, technical plans, 
 │   └── colibri-glm/
 │       └── SKILL.md        # Skill for managing and optimizing GLM on Colibrì
 ├── references/             # Project references, deployment plans, and architectural notes
+│   ├── docs/               # User guides, quickstart manuals, and operational instructions
+│   │   └── getting_started.md
 │   ├── plans/              # Actionable implementation plans and roadmaps
 │   │   └── glm53_deployment_plan.md
 │   └── notes/              # Deep-dive technical notes and host environment specs
