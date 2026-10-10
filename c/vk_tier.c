@@ -721,7 +721,7 @@ static int st_alloc(void) {
         T.st_ok = 0;
         return 0;
     }
-    if (n < T.st_slots) fprintf(stderr, "[VK] tier %s: %d of %d streaming slots\n", T.engine, n, T.st_slots);
+    fprintf(stderr, "[VK] tier %s: %d streaming slots allocated on the device\n", T.engine, n);
     T.st_per = n / 2;
     return 1;
 }
@@ -1622,6 +1622,7 @@ int vkt_init(const VktConfig *cfg, uint32_t *const *heat) {
         need < lim && need <= coli_vk_block_bytes((size_t)256 << 20)) lim = need;
     coli_vk_tier_pool_limit(lim);
     if (T.xmax) coli_vk_tier_extra_pool_limit(T.x_budget);
+    if (T.st_ok) st_alloc();
     const char *ex = getenv("COLI_VK_TIER_EXCLUSIVE");
     T.excl = !(ex && *ex == '0');
     if (T.excl) {

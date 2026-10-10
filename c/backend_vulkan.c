@@ -694,7 +694,12 @@ static int alloc_buf_mt(size_t bytes, VkBuffer *buf, VkDeviceMemory *mem, void *
         .priority = G.prio};
     if (G.has_prio) ai.pNext = &pri;
 #endif
-    VKCHECK(vkAllocateMemory(G.dev, &ai, NULL, mem), "vkAllocateMemory");
+    VkResult _ar = vkAllocateMemory(G.dev, &ai, NULL, mem);
+    if (_ar != VK_SUCCESS) {
+        fprintf(stderr, "[VK] vkAllocateMemory failed: %d (size %zu = %.1f MiB, memtype %u)\n",
+                _ar, (size_t)ai.allocationSize, (double)ai.allocationSize / 1048576.0, ai.memoryTypeIndex);
+        return 0;
+    }
     VKCHECK(vkBindBufferMemory(G.dev, *buf, *mem, 0), "vkBindBufferMemory");
     if (ptr) VKCHECK(vkMapMemory(G.dev, *mem, 0, bytes, 0, ptr), "vkMapMemory");
     return 1;
