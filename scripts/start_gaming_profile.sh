@@ -31,6 +31,7 @@ echo "[Gaming Profile] Launching tuned Colibrì background server..."
 nice -n 12 env \
   COLI_VULKAN=1 \
   COLI_MODEL=/models/glm-5.3 \
+  COLI_MODEL_MIRROR=/workspaces/colibri/models_mirror/glm-5.3 \
   COLI_VRAM_CACHE_MB=105000 \
   CTX=65536 \
   KV8=0 \
@@ -43,9 +44,10 @@ nice -n 12 env \
   COLI_VK_TIER_RESERVE_GB=2.0 \
   COLI_VK_TIER_STREAM_SLOTS=16 \
   COLI_VK_TIER_STREAM_HALF=64 \
-  COLI_VK_TIER_STREAM_ROWS=8 \
-  COLI_VK_CHAIN_ROWS=128 \
+  COLI_VK_TIER_STREAM_ROWS=2 \
+  COLI_VK_CHAIN_ROWS=256 \
   OMP_NUM_THREADS=8 \
+  COLI_KV_SLOTS=2 \
   COLI_KV_SHARE=1 \
   COLI_VK_DEV2=auto \
   COLI_VK_EXPERTS2=1100 \

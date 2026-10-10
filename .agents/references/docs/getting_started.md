@@ -97,19 +97,22 @@ cd /workspaces/colibri
 COLI_VULKAN=1 \
 COLI_VRAM_CACHE_MB=105000 \
 CTX=65536 \
-KV8=1 \
+KV8=0 \
+COLI_KV_SLOTS=2 \
 COLI_MODEL=/models/glm-5.3 \
 ./coli serve \
   --model /models/glm-5.3 \
+  --kv-slots 2 \
   --ram 70 \
   --host 0.0.0.0 \
   --port 8000
 ```
+> **Important:** Always use `KV8=0` (enables Vulkan GPU dense chain) and `--kv-slots 2` (prevents auxiliary grammar/tool requests from evicting the agent harness prefix in Slot 0).
 
 ### Start Web UI Dashboard Mode
 ```bash
 cd /workspaces/colibri
-./coli web --model /models/glm-5.3 --host 0.0.0.0 --port 8000 --no-browser
+COLI_KV_SLOTS=2 KV8=0 ./coli web --model /models/glm-5.3 --kv-slots 2 --host 0.0.0.0 --port 8000 --no-browser
 ```
 
 ### Check Server Status & Recent Logs
@@ -201,7 +204,7 @@ vibe-gaming chat --resume <session_id>
 | :--- | :--- |
 | **Check Status** | `./coli status` |
 | **Check Logs** | `./coli logs` |
-| **Start Server** | `COLI_VULKAN=1 ./coli serve --model /models/glm-5.3 --ram 70 --host 0.0.0.0 --port 8000` |
+| **Start Server** | `COLI_VULKAN=1 KV8=0 COLI_KV_SLOTS=2 ./coli serve --model /models/glm-5.3 --kv-slots 2 --ram 70 --host 0.0.0.0 --port 8000` |
 | **Stop Server** | `./coli stop` |
 | **Interactive Engine Chat** | `COLI_VULKAN=1 ./coli chat --model glm-5.3 --ram 70` |
 | **Attach to Running Engine** | `./coli chat --attach` |

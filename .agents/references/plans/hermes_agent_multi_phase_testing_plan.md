@@ -34,16 +34,21 @@ With the foundational engine architecture and hardware-tuned configuration estab
 | **Storage Engine (I/O)** | `DIRECT=1`, `PIPE=1`, `PIPE_WORKERS=16` | `O_DIRECT` bypasses ext4 page cache double-copying; 16 async threads stream at 6.04 GB/s | `serve.log` / `vmstat` |
 | **Chain Dispatch Sizing** | `COLI_VK_CHAIN_ROWS=128`, slots: 16, scratch: 64 | Bounded forward dispatches; prevents Xorg display watchdog timeouts on GPU 0 | `serve.log` |
 | **Prefix Cache Sharing** | `COLI_KV_SHARE=1` | Multi-turn Radix KV cache prefix adoption (reusing >3,700 tokens across turns) | `serve.log` |
+| **KV Cache Slots** | `--kv-slots 2` (`COLI_KV_SLOTS=2`) | Multi-slot KV isolation: Slot 0 preserves 3,764-token agent harness; Slot 1 handles auxiliary requests | `serve.log` / `curl /health` |
 | **Hermes Profile** | `vibe-gaming` | Calibrated reasoning (`low`), lean system prompt, tool definitions intact | `hermes -p vibe-gaming config` |
 
 ### 2.2 Turnaround Time Strategy: Achieving 10–20s Response Times on Agent Workloads
 
-When operating autonomous agent frameworks like Hermes with large toolsets, initial generation latency is dominated by prompt prefill rather than token decoding. To achieve responsive 10–20 second response times during coding sessions, two pillars must be maintained:
+When operating autonomous agent frameworks like Hermes with large toolsets, initial generation latency is dominated by prompt prefill rather than token decoding. To achieve responsive 10–20 second response times during coding sessions, three pillars must be maintained:
 
 1. **Keep `KV8=0` (GPU Dense Chain Enabled):**
    In [`scripts/start_gaming_profile.sh`](file:///workspaces/colibri/scripts/start_gaming_profile.sh), `KV8=0` is configured specifically so that all 78 layers of dense matrix multiplications and MLA attention stay on the RTX PRO 6000 Blackwell GPU (`[VK] colibri chain: 78 of 78 layers on the device`), speeding up prefill by an order of magnitude. In contrast, setting `KV8=1` disables the GPU dense chain in [`c/glm_chain.h` Line 722](file:///workspaces/colibri/c/glm_chain.h#L720-L723) and drops dense attention to the CPU, causing Turn 1 prefill to stall for 46.5 minutes.
 2. **KV Cache Prefix Reuse (`COLI_KV_SHARE=1`):**
    Once the initial 3,757-token prompt (system instructions + 5 tool schemas) completes its prefill pass, the system prompt prefix is preserved in the engine's KV cache (`prefix 3759/3759 token, prefill 0`). Subsequent queries take only **10–20 seconds** because they skip prefilling the 3,757-token prefix entirely.
+3. **Multi-Slot KV Cache Isolation (`--kv-slots 2` or `4` / `COLI_KV_SLOTS=2`):**
+   Hermes Agent frequently issues short auxiliary requests (such as 235-token grammar checks, tool schema probing, or background token evaluations) before or between user turns. Under the default single-slot mode (`kv_slots=1`), any auxiliary request immediately clobbers `KV slot 0`, wiping out the 3,764-token agent harness prefix and forcing the engine into repeated 24-minute cold prefills. Allocating multiple slots isolates workloads:
+   * **Slot 0:** Permanently holds the 3,764-token Hermes agent harness (system instructions + active tools).
+   * **Slot 1:** Absorbs auxiliary grammar/probe turns without evicting Slot 0.
 
 ---
 
@@ -382,8 +387,43 @@ During live execution of Milestone 7 and Phase 1 testing, six fundamental system
   [VK] colibri: dense weights on the device and in host RAM (the dense part runs on the CPU)
   ```
   While short prompts (5–10 tokens in `./coli chat`) compute on the CPU instantaneously, Hermes Agent injects **3,757 tokens** of system instructions and 5 tool schemas on Turn 1. Computing attention across 78 layers on the CPU with 8 threads at `nice -n 12` took **35.8 seconds per layer $\times$ 78 layers = 2,790.63 seconds (46.5 minutes)**.
-* **Resolution & Operational Strategy:**
-  1. *Keep `KV8=0` for all Hermes agent workflows:* Ensures GPU 0 hardware acceleration for prompt prefill.
-  2. *Retain memory expansions:* Maintain `RAM_GB=70` (17 slots/layer host cache) and `COLI_VRAM_CACHE_MB=105000` (4,444 VRAM resident experts with 99.8% GPU hit rate).
-  3. *KV Cache Reuse:* Once the 3,757-token system prompt prefix is processed, subsequent queries reuse the prefix (`prefix 3759/3759 token, prefill 0`), executing in **10–20 seconds**.
+### Finding 8: Dual-NVMe Striped Mirroring & Cold Expert GPU Streaming Optimization
+* **Discovery:** During cold prefill analysis of 3,764-token agent prompts:
+  1. *Single-Drive Bottleneck:* Reading all cold experts from `/dev/nvme1` (Gen 5 x2) was bounded by 5.12 GB/s.
+  2. *Cold Expert CPU Fallback:* With `COLI_VK_TIER_STREAM_ROWS=8` and 128-row steps, an expert needed $\ge 8$ row selections in a step to be streamed to GPU. Since 128 rows averaged only 4–6 rows per expert, ~184 cold experts per layer dropped back to slow CPU execution on disk pread loops.
+* **Remediation & Implementation:**
+  1. *Dual-NVMe Mirroring (`COLI_MODEL_MIRROR`):* Staged 55 hot model shards (~146 GiB) onto the Gen 5 x4 primary SSD (`/workspaces/colibri/models_mirror/glm-5.3`). Startup probe confirmed **15.19 GB/s aggregate bandwidth** (10.07 GB/s mirror + 5.12 GB/s primary, 66% / 34% read split). Added `models_mirror/` to `.gitignore`.
+  2. *Low Streaming Threshold (`COLI_VK_TIER_STREAM_ROWS=2`):* Experts with $\ge 2$ rows stream directly to GPU, streaming **186 cold experts per layer** and reducing CPU fallback from 184 experts down to 14–21 experts per layer.
+  3. *Increased Chunk Size (`COLI_VK_CHAIN_ROWS=256`):* Reduced total forward steps from 30 down to 15.
+* **Empirical Benchmark Verification (`2026-10-10 18:58:41`):**
+  - **Cold Prefill Latency:** **23m 53s** (a 48.6% latency reduction from the 46m 30s CPU baseline).
+  - **Sustained Disk Line Rate:** **4.55 GB/s** continuously sustained across 157,608 cold experts (3,131.85 GiB streamed).
+  - **Device Execution Share:** **98.8%** of routed experts executed directly on the GPUs (2,233,556 of 2,260,800).
+  - **Answer Output:** Successfully returned `"4"` with clean agent completion (`agent_close`).
+
+### Finding 9: The Single KV Slot (`kv_slots=1`) Clobber Trap & Multi-Slot Isolation Fix (`--kv-slots 2` or `4`)
+* **Discovery & Empirical Root Cause Analysis:**
+  During multi-turn execution of `vibe-gaming -z "What is 2+2?"`:
+  1. *Turn 1 Completed Successfully:* In session `20261010_185843_7a15ed`, the cold 3,764-token prefill completed cleanly at `19:22:34` (23m 50s duration) and correctly stored the system prompt and tool definitions into `KV slot 0`.
+  2. *Auxiliary Request Clobbers Slot 0:* At `19:22:43`, when the subsequent command initialized, Hermes Agent dispatched a lightweight auxiliary request (grammar checking / schema validation) consisting of only **235 tokens**:
+     ```text
+     [GRAMMAR] request: 11 rules, forced span capped at 24 tokens/forward
+     [API] KV slot 0 prefix 3/235 token, prefill 232
+     ```
+  3. *Cache Eviction:* Because the server was launched with the default single-slot allocation (`kv_slots=1`), this small 235-token auxiliary request was assigned to `KV slot 0`, **completely overwriting and evicting** the 3,764-token agent harness prefix that had just been computed.
+  4. *Catastrophic Re-Prefill:* When Hermes immediately followed up with its primary user completion request (3,759 tokens), Colibrì checked `KV slot 0` and found only 3 prefix tokens matching:
+     ```text
+     [API] KV slot 0 prefix 3/3759 token, prefill 3756
+     ```
+     Instead of achieving an instantaneous `prefill 0` turn (10–20 seconds), the engine was forced to restart the full 3,756-token prefill from token 0 all over again, consuming another 24 minutes.
+* **Architecture & Mechanics in [`c/openai_server.py`](file:///workspaces/colibri/c/openai_server.py#L3901-L7384):**
+  - By default, `kv_slots = 1`. Any auxiliary request, tool verification probe, or background generation clobbers the active user conversation.
+  - When `kv_slots > 1`, `openai_server.py` implements conversation hashing (`conversation_cache_slot(conversation, kv_slots)`). Distinct requests are partitioned into independent slots, or callers can target specific slots explicitly via `cache_slot`.
+* **Permanent Fix & Configuration:**
+  - Launch Colibrì with multiple dedicated KV slots (`--kv-slots 2` or `--kv-slots 4`, or set `COLI_KV_SLOTS=2`):
+    - **Slot 0:** Permanently stores and preserves the heavy 3,764-token Hermes agent harness (system prompt + 5 tool schemas).
+    - **Slot 1:** Absorbs short auxiliary turns, grammar rule enforcements (235 tokens), and tool health checks without touching Slot 0.
+  - **Result & Empirical Verification:** The 3,764-token agent harness is never evicted by auxiliary calls. User queries and iterative coding turns achieve **100% KV prefix reuse (`prefix 3759/3759, prefill 0`)**:
+    - **Empirical Run (2026-10-10 20:12:48):** Answered `"What is 2+2?"` in **7.797 seconds** (`real 0m7.797s`), surpassing the 10–20 second target and achieving a **358× speedup** over the initial unoptimized run.
+
 
