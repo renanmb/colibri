@@ -1604,6 +1604,7 @@ int vkt_init(const VktConfig *cfg, uint32_t *const *heat) {
             T.st_par = !(sp && *sp == '0');
             const char *sh = getenv("COLI_VK_TIER_STREAM_HALF");   /* tests: small sub-batches */
             if (sh && *sh && atoi(sh) > 0) T.st_half = atoi(sh) > 65535 ? 65535 : atoi(sh);
+            else if (T.st_half > 64) T.st_half = 64; /* cap default sub-batch rows so scratch stays <= 72 MiB */
             T.bcnt = malloc((size_t)T.c.experts * sizeof(int)); T.bofs = malloc((size_t)T.c.experts * sizeof(int));
             T.bcls = malloc((size_t)T.c.experts * sizeof(int));
             T.pred = calloc((size_t)T.c.layers * T.c.experts, sizeof(uint32_t)); T.pred_ok = calloc((size_t)T.c.layers, 1);
@@ -1622,7 +1623,12 @@ int vkt_init(const VktConfig *cfg, uint32_t *const *heat) {
         need < lim && need <= coli_vk_block_bytes((size_t)256 << 20)) lim = need;
     coli_vk_tier_pool_limit(lim);
     if (T.xmax) coli_vk_tier_extra_pool_limit(T.x_budget);
-    if (T.st_ok) st_alloc();
+    if (T.st_ok) {
+        st_alloc();
+        if (coli_vk_xb_sub_reserve(T.st_half, T.c.experts + 1))
+            fprintf(stderr, "[VK] tier %s: expert batch scratch reserved (%d rows, %d experts)\n",
+                    eng, T.st_half, T.c.experts + 1);
+    }
     const char *ex = getenv("COLI_VK_TIER_EXCLUSIVE");
     T.excl = !(ex && *ex == '0');
     if (T.excl) {

@@ -24,10 +24,12 @@ nice -n 12 env \
   RAM_GB=48 \
   COLI_VK_TIER_RESERVE_GB=10.0 \
   COLI_VK_TIER_STREAM_SLOTS=16 \
+  COLI_VK_TIER_STREAM_HALF=64 \
+  COLI_VK_TIER_STREAM_ROWS=8 \
+  COLI_VK_CHAIN_ROWS=512 \
   OMP_NUM_THREADS=8 \
   COLI_KV_SHARE=1 \
   COLI_VK_DEV2=auto \
-  COLI_VK_CHAIN_ROWS=512 \
   KV8=0 \
   python3 c/coli start --background --no-browser
 
