@@ -23,7 +23,7 @@ The infrastructure validation phase is complete. Below are the **four recommende
 |:---:|---|:---:|:---:|---|---|
 | **Path 1** | **Daily Pair-Programming** | **Ready to Use** | **P1 (Immediate)** | Transition to real-world development using `vibe-gaming chat -c <name>`. | **10s–2m turn turnaround** via warm Radix KV cache; live `<think>` CoT streaming. |
 | **Path 2** | **Dual-NVMe Shard Mirroring** | **COMPLETED & VERIFIED** | **Done** | Mirrored 100% of GLM-5.3 shards (141/141) from `/models` to `/workspaces/colibri/models_mirror`. | **16.16 GB/s aggregate throughput** (46%/54% split); cold prompt time collapsed to **3m 04s**. |
-| **Path 3** | **GLM-5.3-Flash Companion** | **Available / Next** | **P3 (Exploratory)** | Configure GLM-5.3-Flash (321B multimodal) for vision inspection and high-speed pair programming. | **Multimodal (Vision + Text)**; ~195 GB int4; >65% VRAM resident on 128 GB dual-GPU setup. |
+| **Path 3** | **GLM-5.3-Flash Companion** | **DOWNLOADED & VERIFIED** | **Done** | Downloaded 100% of shards (62/62, 182 GB) to `/models/glm-5.3-flash`. | **Multimodal (Vision + Text)**; passes `coli doctor`; ready for serving when desired. |
 | **Path 4** | **Workstation Boot Automation** | **Available / Next** | **P2 (Operational)** | Configure `systemd --user` service for automatic startup, clock locking (14,001 MHz), and background serving. | Zero-touch workstation boot; persistent listening port `:8000`; instant pairing on login. |
 
 ---
@@ -99,9 +99,17 @@ While GLM-5.3 (744B) is your flagship heavy-duty reasoning engine, **GLM-5.3-Fla
 | **VRAM Residency on 128 GB Setup** | 44.5% resident (94.4 GiB in VRAM) | **>65% resident** (holds majority of MoE weights in GDDR) |
 | **Typical Turn Latency** | 10s–2m warm / ~3–14m cold | **Significantly faster** (higher VRAM residency, fewer total layers) |
 
+### Download Status & Storage Verification (COMPLETED)
+* **Download Status:** **100% Complete & Verified** via `huggingface-cli` (`task-3788` completed in 25m 30s).
+* **Storage Location:** [`/models/glm-5.3-flash`](file:///models/glm-5.3-flash) (on host: `/mnt/models_fast/glm-5.3-flash`).
+* **Disk Footprint:** **182 GB** across 62 safetensors shards (all valid).
+* **Model Health Check:** Verified via `python3 c/coli doctor --model /models/glm-5.3-flash` (configuration, tokenizer, family registry, and shard headers all passing).
+* **Engine Binary:** [`c/glm53`](file:///workspaces/colibri/c/glm53) compiled and ready with native AVX-512 and Vulkan acceleration.
+* **Storage Headroom:** **3.0 TB free space remaining** on `/dev/nvme1n1p1`.
+
 ### Use Case & Multimodal Extension
 * **Visual Inspection:** Supports image inputs (screenshots, UI design mocks, architecture diagrams) directly alongside code.
-* **Storage Allocation:** Fits comfortably on `/models/glm-5.3-flash` on `/dev/nvme1` (which currently has **3.2 TB free space**).
+* **Storage Allocation:** Fits comfortably on `/models/glm-5.3-flash` on `/dev/nvme1`.
 
 ---
 
@@ -143,4 +151,5 @@ WantedBy=default.target
 | **Done** | **Path 2: NVMe Striping** | Mirrored 141/141 shards to `models_mirror/glm-5.3`; verified 16.16 GB/s line rate and 3m 04s response | **COMPLETED & VERIFIED** |
 | **P1** | **Path 1: Real-World Usage** | Launch a named session on your target feature or codebase (`vibe-gaming chat -c "<name>"`) | **Ready to Use** (Immediate) |
 | **P2** | **Path 4: Automation** | Install `systemd` user service for zero-touch boot startup and automatic GPU clock locking | **Available / Next** (~5 min setup) |
-| **P3** | **Path 3: Multi-Model** | Download and configure GLM-5.3-Flash as a sub-second companion agent in Hermes | **Available / Next** (~30 min setup) |
+| **Done** | **Path 3: GLM-5.3-Flash Download** | Downloaded 100% of shards (62/62, 182 GB) to `/models/glm-5.3-flash`; verified via `coli doctor` | **DOWNLOADED & VERIFIED** |
+| **Available**| **Path 3: Flash Service Configuration** | Configure multi-model routing / auxiliary profile in Hermes for Flash | **Available / Next** (~15 min setup) |
