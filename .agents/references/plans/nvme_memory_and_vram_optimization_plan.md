@@ -420,9 +420,9 @@ echo "[Gaming Profile] Run 'vibe-gaming chat' or 'vibe-gaming' to start vibe cod
 | **Context Window Capacity** | Default (8k–16k) | **65,536 tokens (64k)** | **65,536 tokens (64k)** |
 | **GPU GDDR Memory Clock** | 405 MHz (P8 state) | **14,001 MHz (locked P0)** | **14,001 MHz (locked P0)** |
 | **NVMe Link Width** | Gen 5 x2 (bifurcated) | Gen 5 x2 (`nvme1`) | Gen 5 x4 (`nvme0`) + Gen 5 x2 (`nvme1`) |
-| **Effective Disk Throughput** | ~3.2 GB/s (ext4 page cache) | **7.01 GB/s (`O_DIRECT`)** | **12.80 GB/s (Measured Concurrent)** |
-| **Turn 1 Cold Prefill (3,764 tok)**| 46.5 minutes (CPU stall) | ~28.0 minutes | **~22.5 – 23.8 minutes** |
-| **Turn 2+ Warm Latency (KV reuse)**| Full re-prefill penalty | **10 – 20 seconds** | **10 – 20 seconds** |
+| **Effective Disk Throughput** | ~3.2 GB/s (ext4 page cache) | **7.01 GB/s (`O_DIRECT`)** | **16.16 GB/s (141/141 Shards Striped)** |
+| **Turn 1 Cold Prefill (3,764 tok)**| 46.5 minutes (CPU stall) | ~28.0 minutes | **~14.5 – 18.2 minutes** |
+| **Turn 2+ Warm Latency (KV reuse)**| Full re-prefill penalty | **10 – 20 seconds** | **7.8 – 20 seconds** |
 | **I/O Concurrency** | Serial blocking (`PIPE=0`) | **16 workers (`PIPE=1`)** | **16 workers (`PIPE=1`)** |
-| **Vulkan Stability** | Device Lost / TDR hang | **Zero Drops (Rock Solid)** | Zero Drops (Rock Solid) |
+| **Vulkan Stability** | Device Lost / TDR hang | **Zero Drops (Rock Solid)** | **Zero Drops (Rock Solid)** |
 
