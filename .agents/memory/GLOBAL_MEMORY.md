@@ -12,6 +12,7 @@
   - Host has a symlink `/models` pointing to `/mnt/models_fast`.
   - Inside the devcontainer, `/models` maps directly to this filesystem.
   - Never download models to `/root` or `/workspaces` — always store them in `/models`!
+- **Git Restrictions (STRICT BAN):** The agent is strictly forbidden from executing `git commit` or `git push`. All staging, committing, and pushing must be performed manually by the human user.
 
 ---
 

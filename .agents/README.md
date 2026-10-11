@@ -12,6 +12,8 @@ This repository stores agent skills, architectural references, technical plans, 
 ├── skills/                 # Antigravity agent skills (on-demand runbooks & procedures)
 │   └── colibri-glm/
 │       └── SKILL.md        # Skill for managing and optimizing GLM on Colibrì
+├── rules/                  # Hierarchical agent rules and constraints
+│   └── git_rules.md        # Strict ban on git commit and git push by agents
 ├── references/             # Project references, deployment plans, and architectural notes
 │   ├── docs/               # User guides, quickstart manuals, and operational instructions
 │   │   └── getting_started.md
@@ -33,3 +35,5 @@ This repository stores agent skills, architectural references, technical plans, 
 1. **Context Awareness:** Always remember that this environment runs inside a Docker Devcontainer on an Ubuntu host with two Samsung 9100 PRO 4TB NVMe drives and dual NVIDIA GPUs (RTX PRO 6000 Blackwell + RTX 5090).
 2. **Memory Updates:** At the end of major milestones, update `memory/GLOBAL_MEMORY.md` and log the session record in `memory/sessions/`.
 3. **Reference Documents:** When modifying architecture or hardware placement, keep `references/` documents up to date.
+4. **Git Operations Ban:** The agent is STRICTLY FORBIDDEN from running `git commit` and `git push`. Leave all staging, committing, and pushing entirely to the user.
+
