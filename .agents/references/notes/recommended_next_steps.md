@@ -23,7 +23,7 @@ The infrastructure validation phase is complete. Below are the **four recommende
 |:---:|---|:---:|:---:|---|---|
 | **Path 1** | **Daily Pair-Programming** | **Ready to Use** | **P1 (Immediate)** | Transition to real-world development using `vibe-gaming chat -c <name>`. | **10s–2m turn turnaround** via warm Radix KV cache; live `<think>` CoT streaming. |
 | **Path 2** | **Dual-NVMe Shard Mirroring** | **COMPLETED & VERIFIED** | **Done** | Mirrored 100% of GLM-5.3 shards (141/141) from `/models` to `/workspaces/colibri/models_mirror`. | **16.16 GB/s aggregate throughput** (46%/54% split); cold prompt time collapsed to **3m 04s**. |
-| **Path 3** | **GLM-5.3-Flash Companion** | **Available / Next** | **P3 (Exploratory)** | Configure GLM-5.3-Flash for lightweight triage, syntax, and background research subagents. | **Sub-second responses** (30–60 tok/s); zero NVMe disk streaming; fits in ~8–12 GB VRAM. |
+| **Path 3** | **GLM-5.3-Flash Companion** | **Available / Next** | **P3 (Exploratory)** | Configure GLM-5.3-Flash (321B multimodal) for vision inspection and high-speed pair programming. | **Multimodal (Vision + Text)**; ~195 GB int4; >65% VRAM resident on 128 GB dual-GPU setup. |
 | **Path 4** | **Workstation Boot Automation** | **Available / Next** | **P2 (Operational)** | Configure `systemd --user` service for automatic startup, clock locking (14,001 MHz), and background serving. | Zero-touch workstation boot; persistent listening port `:8000`; instant pairing on login. |
 
 ---
@@ -84,20 +84,24 @@ A verification query (`vibe-gaming -z "What is 3+3?"`) was executed against the 
 
 ---
 
-## 4. Strategic Path 3: Deploy GLM-5.3-Flash for Instant Sub-Second Tasks
+## 4. Strategic Path 3: Deploy GLM-5.3-Flash (321B Multimodal Model)
 
-While GLM-5.3 (744B) is the primary heavy-duty reasoning engine, the smaller **GLM-5.3-Flash** model (documented in the `colibri-glm` skill) is an ultra-fast companion.
+While GLM-5.3 (744B) is your flagship heavy-duty reasoning engine, **GLM-5.3-Flash** (documented in the `colibri-glm` skill) is a 321B multimodal (vision + text) Mixture-of-Experts model:
 
-### Architectural Fit
-| Characteristic | GLM-5.3 (744B MoE) | GLM-5.3-Flash |
+### Architectural Fit & Comparison
+| Characteristic | GLM-5.3 (744B Flagship) | GLM-5.3-Flash (321B Multimodal) |
 |---|---|---|
-| **Primary Role** | Deep architecture, complex refactoring, multi-turn bug loops | Quick triage, linting, syntax lookups, commit messages |
-| **Placement** | Hybrid (94.4 GB in VRAM + NVMe streaming) | 100% Resident in VRAM (zero NVMe streaming required) |
-| **Response Latency** | 10s–2m warm / ~21m cold | **Sub-second (instant, 30–60 tokens/sec)** |
-| **VRAM Footprint** | 73.4 GiB (GPU 0) + 22.6 GiB (GPU 1) | ~8–12 GiB |
+| **Parameter Scale** | **744 Billion** parameters | **321 Billion** parameters |
+| **Model Architecture** | 78 MLA layers with top-8 routed experts | 34 recurrent KDA layers + 11 MLA layers with DSA + Vision Tower |
+| **Quantized Disk Size** | **419.3 GB** (`int4-gs64`, 141 shards) | **~195 GB** (`int4-gs64`, pre-quantized from 328 GB BF16) |
+| **Engine Binary** | `c/colibri` (`make colibri VK=1`) | `c/glm53` (`make glm53 VK=1`) |
+| **Input Modalities** | Pure Text & Tools | **Multimodal: Vision (Images) + Text + Tools** |
+| **VRAM Residency on 128 GB Setup** | 44.5% resident (94.4 GiB in VRAM) | **>65% resident** (holds majority of MoE weights in GDDR) |
+| **Typical Turn Latency** | 10s–2m warm / ~3–14m cold | **Significantly faster** (higher VRAM residency, fewer total layers) |
 
-### Multi-Model Delegation Workflow
-Configure Hermes to use Flash for auxiliary background tasks (e.g., commit message generation, web extracts, title generation, or quick research subagents), while keeping the main conversational session pinned to GLM-5.3 744B.
+### Use Case & Multimodal Extension
+* **Visual Inspection:** Supports image inputs (screenshots, UI design mocks, architecture diagrams) directly alongside code.
+* **Storage Allocation:** Fits comfortably on `/models/glm-5.3-flash` on `/dev/nvme1` (which currently has **3.2 TB free space**).
 
 ---
 
