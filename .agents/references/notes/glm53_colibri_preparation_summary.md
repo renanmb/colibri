@@ -36,9 +36,13 @@ There are two separate models in the GLM-5.3 family supported by Colibrì:
 | **Engine Executable** | [`c/colibri.c`](file:///workspaces/colibri/c/colibri.c) (binary: `colibri`, alias `glm`) | [`c/glm53.c`](file:///workspaces/colibri/c/glm53.c) (binary: `glm53`) |
 | **Catalog ID** | `glm-5.3` (family: `glm`) | `glm53` (family: `glm53`) |
 | **Hugging Face Repo** | [`Justvugg/GLM-5.3-colibri-int4-g64`](https://huggingface.co/Justvugg/GLM-5.3-colibri-int4-g64) | [`Justvugg/GLM-5.3-Flash-colibri-int4-g64`](https://huggingface.co/Justvugg/GLM-5.3-Flash-colibri-int4-g64) |
-| **Download Size** | **419.3 GB** (int4-gs64, no MTP head) | **194.7 GB** (converted container) |
-| **Resident RAM** | ~9.9 GB | ~12.0 GB |
-| **Modality** | Text / Code / Complex Reasoning | Text + Vision (24-block ViT tower) |
+| **Container Path** | [`/models/glm-5.3`](file:///models/glm-5.3) | [`/models/glm-5.3-flash`](file:///models/glm-5.3-flash) |
+| **Host Path** | `/mnt/models_fast/glm-5.3` | `/mnt/models_fast/glm-5.3-flash` |
+| **Dual-NVMe Mirror** | [`/workspaces/colibri/models_mirror/glm-5.3`](file:///workspaces/colibri/models_mirror/glm-5.3) (141/141 shards) | Stored directly on `/models/glm-5.3-flash` |
+| **Disk Size on NVMe** | **419.3 GB** (141 safetensors shards) | **182 GB** (62 safetensors shards) |
+| **Resident RAM** | ~9.9 GB (dense trunk) | ~6.9 GB (dense trunk) |
+| **Modality** | Text / Code / Complex Reasoning / Tools | **Multimodal: Vision (Images) + Text + Tools** |
+| **Status** | **Serving Live on Port 8000** (16.16 GB/s dual-NVMe) | **Downloaded, Verified, Ready on Disk** |
 
 > [!IMPORTANT]
 > **Quantization Format:** Always use group-scaled **`int4-gs64`** containers. Older per-row 4-bit quantizations degrade benchmark quality by ~9pp and cause infinite loops during reasoning turns. Both recommended repositories above use `int4-gs64`.
@@ -108,13 +112,76 @@ df: /models: No such file or directory
    ```text
    UUID=dec24f4a-6705-4192-af43-5c6ac0f29b50 /mnt/models_fast ext4 noatime,nodiratime,errors=remount-ro 0 2
    ```
-4. **Verification:**
-   Both host and container now point to the identical 3.6 TB filesystem. Running `df -h /models` produces:
+4. **Verification & Storage Telemetry:**
+   Both host and container point to the identical 3.6 TB NVMe partition (`/dev/nvme1n1p1`), currently housing both models with 3.0 TB of remaining headroom:
    ```text
    Filesystem      Size  Used Avail Use% Mounted on
-   /dev/nvme1n1p1  3.6T   36K  3.6T   1% /mnt/models_fast  # (on host)
-   /dev/nvme1n1p1  3.6T   36K  3.6T   1% /models           # (in container)
+   /dev/nvme1n1p1  3.6T  575G  3.0T  16% /mnt/models_fast  # (on host)
+   /dev/nvme1n1p1  3.6T  575G  3.0T  16% /models           # (in container)
    ```
+
+### 5.1 Commands to Check and Inspect Both Models
+
+Depending on whether you are working **inside the VS Code devcontainer terminal** or **on the host machine terminal**, use the following commands to check model locations, file counts, disk footprints, and health status:
+
+#### A. Checking GLM-5.3 (744B Flagship Model)
+
+* **Directory & Shards (Inside Container):**
+  ```bash
+  # View files in primary store (141 shards)
+  ls -lh /models/glm-5.3
+  ls /models/glm-5.3/*.safetensors | wc -l
+
+  # Check primary store disk footprint (~419 GB)
+  du -sh /models/glm-5.3
+
+  # Check fast nvme0 mirror copy (141 shards)
+  ls -lh /workspaces/colibri/models_mirror/glm-5.3
+  ls /workspaces/colibri/models_mirror/glm-5.3/*.safetensors | wc -l
+  du -sh /workspaces/colibri/models_mirror/glm-5.3
+  ```
+* **Directory & Shards (On Host Machine):**
+  ```bash
+  ls -lh /mnt/models_fast/glm-5.3
+  du -sh /mnt/models_fast/glm-5.3
+  ```
+* **Engine Health Check:**
+  ```bash
+  python3 /workspaces/colibri/c/coli doctor --model /models/glm-5.3
+  ```
+
+#### B. Checking GLM-5.3-Flash (321B Multimodal Model)
+
+* **Directory & Shards (Inside Container):**
+  ```bash
+  # View files and verify all 62 shards
+  ls -lh /models/glm-5.3-flash
+  ls /models/glm-5.3-flash/*.safetensors | wc -l
+
+  # Check disk footprint (182 GB)
+  du -sh /models/glm-5.3-flash
+  ```
+* **Directory & Shards (On Host Machine):**
+  ```bash
+  ls -lh /mnt/models_fast/glm-5.3-flash
+  du -sh /mnt/models_fast/glm-5.3-flash
+  ```
+* **Engine Health Check:**
+  ```bash
+  python3 /workspaces/colibri/c/coli doctor --model /models/glm-5.3-flash
+  ```
+
+#### C. Checking NVMe Drive Free Space & Mounts
+
+* **Inside Container:**
+  ```bash
+  # Check dedicated model drive (/models on nvme1) and workspace drive (/workspaces on nvme0)
+  df -h /models /workspaces/colibri
+  ```
+* **On Host Machine:**
+  ```bash
+  df -h /mnt/models_fast /
+  ```
 
 ---
 
