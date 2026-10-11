@@ -33,6 +33,7 @@ nice -n 12 env \
   COLI_MODEL=/models/glm-5.3-flash \
   COLI_VRAM_CACHE_MB=105000 \
   CTX=65536 \
+  GLM53_MAXT=65536 \
   KV8=0 \
   GLM53_EXPERT_GB=20.0 \
   RAM_GB=40.0 \

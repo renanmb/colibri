@@ -237,15 +237,20 @@ This phase verifies multi-file reasoning, test-driven debugging, and repository 
 #### Side-by-Side Comparison: Test 2.1
 | Metric | GLM-5.3 (744B Flagship) | GLM-5.3-Flash (321B MoE) | Comparative Evaluation |
 |---|---|---|---|
-| **Test Status** | **VERIFIED (Empirical)** | **Benchmarking Protocol Ready** | - |
-| **Total Task Duration**| **101m 43s** (`real 101m43.327s`, session `8d38ec`)| *Target: 25m–35m* | Projected **3× to 4× faster execution** |
-| **Context Scale** | Expanded to **12,153 tokens** (5,562 C code tokens) | Context expands to ~12k tokens | Compare long-context prefill streaming |
-| **Tool Operations** | 6 tool calls (`search_files` x2, `read_file` x4) | 6 tool calls | Compare autonomous exploration path |
-| **C Tracing Accuracy** | **100% Perfect:** Traced `vk_tier.c:940` to `xb_reserve:3754` | *Target: Full call chain verification* | Critical test of architectural reasoning |
-| **Buffer Enumeration** | All 5 identified with exact flags (`mt_host`, `mt_dev`) | *Target: Enumerate all 5 scratch buffers* | Test deep precision |
+| **Test Status** | **VERIFIED (Empirical)** | **VERIFIED (Empirical)** | **100% Functional Parity** |
+| **Total Task Duration**| **101m 43s** (`real 101m43.327s`, session `8d38ec`)| **62m 00s** (3,719.92s in DB, session `75252d`)| ⚡ **1.64× FASTER** (**39m 43s reduction**) |
+| **Context Scale** | Expanded to **12,153 tokens** (41,745 cumulative tokens) | Expanded to **27,251 tokens** (78,001 cumulative tokens) | Flash sustained 1.87× larger cumulative context cleanly |
+| **Tool Operations** | 6 tool calls (`search_files` x2, `read_file` x4) | 10 tool calls (`search_files` x2, `terminal` x3, `read_file` x5) | Flash explored deeper call sites and verified shell paths |
+| **C Tracing Accuracy** | **100% Perfect:** Traced `vk_tier.c:940` to `xb_reserve:3754` | **100% Perfect:** Traced both `vk_tier.c:940` & `1628` through `xb_sub_sizes` to `xb_reserve:3754` | **Flawless parity in deep C architectural analysis** |
+| **Buffer Enumeration** | All 5 identified with exact flags (`mt_host`, `mt_dev`) | All 5 identified (`X->x`, `g`, `u`, `h`, `y`) with exact memory classes (`mt_host`, `mt_dev`, `mt_cached`) | **Superior:** Flash also derived the `6 * (ni - region)` intermediate fit formula |
 
 * **GLM-5.3 Detailed Telemetry:**
   - Session `20261010_203605_8d38ec` consumed 41,745 cumulative tokens and 1,149 output tokens across 12 messages in **101m 43s** (6,101.0s in DB). Perfectly identified the call hierarchy and all 5 scratch buffers (`X->x`, `X->g`, `X->u`, `X->h`, `X->y`).
+* **GLM-5.3-Flash Detailed Telemetry:**
+  - Session `20261011_200124_75252d` completed cleanly in **62m 00s** (3,719.92s in DB), processing 78,001 cumulative prompt tokens and generating 1,521 output tokens across 20 messages and 10 tool calls (`end_reason: agent_close`, exit 0).
+  - Traced `coli_vk_xb_sub_reserve` (`backend_vulkan.c:4575`) from both caller sites (`vk_tier.c:940` prefill step runner and `vk_tier.c:1628` tier setup) through `xb_sub_sizes()` (`backend_vulkan.c:4523`), explained the 2× double-buffering factor, and detailed `xb_reserve` (`backend_vulkan.c:3754`).
+  - Correctly enumerated all 5 scratch buffers (`X->x` token inputs in `mt_host`, `X->g` gate outputs in `mt_dev`, `X->u` up outputs in `mt_dev`, `X->h` SwiGLU hidden rows in `mt_dev`, and `X->y` output rows in `mt_cached`).
+  - Executed cleanly within the updated 65,536 token context window without triggering context compression aborts.
 
 ---
 
@@ -476,7 +481,7 @@ This phase quantifies low-level streaming line rates, multi-turn speedups, and e
 | **Phase 1** | **1.3** | File write & terminal exec | **22m 56s** (1,376.0s, 161 tok)<br>*(Verified, exit 0)* | **9m 32s** (571.8s in DB, session `8ee2b6`, 134 tok)<br>*(Verified, exit 0, `write_file` + `terminal`)* | **2.41× faster completion** (571.8s vs 1,376.0s), 100% identical tool execution graph |
 | **Phase 1** | **1.4** | Codebase search (`search_files`) | Diagnostic session `74916c`<br>*(Tool Verified & Hardened)* | **11m 44s** (704.4s in DB, session `ff5be4`, 302 tok)<br>*(Verified, exit 0, `search_files`)* | **Clean first-pass run** (16 matches, 13 files), accurate `vk_tier.h:253` declaration, stub, and 11 call sites |
 | **Phase 1** | **1.5** | Fuzzy code patch (`patch`) | **8m 28s** (`real 8m28.515s`, 4 turns)<br>*(Verified, exit 0)* | **9m 31s** (571.5s in DB, session `3d2082`, 4 turns)<br>*(Verified, exit 0, `read` $\rightarrow$ `patch` $\rightarrow$ `terminal`)* | ⚡ **4.42× faster interactive tool loop** (63.9s vs 282.4s); total duration reflects cold Turn 1 prefill (8m 27s) caused by divergent session eviction |
-| **Phase 2** | **2.1** | Multi-component code analysis | **101m 43s** (`real 101m43.327s`)<br>*(Verified, exit 0)* | Target: **25m–35m**<br>*(Ready to Benchmark)* | Projected **3× to 4× faster deep analysis** |
+| **Phase 2** | **2.1** | Multi-component code analysis | **101m 43s** (`real 101m43.327s`)<br>*(Verified, exit 0)* | **62m 00s** (3,719.9s in DB, session `75252d`, 20 msgs, 10 tools, 1,521 tok)<br>*(Verified, exit 0)* | ⚡ **1.64× faster completion** (**39m 43s faster**); processed **87% more input tokens** (78k vs 41k) with 100% C architectural tracing parity |
 | **Phase 2** | **2.2** | Automated test-debug-fix loop | **17m 21s** (`real 17m21.777s`)<br>*(Verified, exit 0)* | Target: **4m 30s–6m 00s**<br>*(Ready to Benchmark)* | Projected **~3× faster fix loop** |
 | **Phase 2** | **2.3** | Git status & diff workflow | **14m 49s** (`real 14m49.112s`)<br>*(Verified, exit 0)* | Target: **3m 30s–4m 30s**<br>*(Ready to Benchmark)* | Projected **~3.5× faster status analysis** |
 | **Phase 3** | **3.1** | Interactive TUI launch & streaming | **4m 20s** initial stream<br>*(Verified, exit 0)* | Target: **1m 00s–1m 30s**<br>*(Ready to Benchmark)* | Projected **~3× faster launch & response** |
@@ -551,4 +556,14 @@ During live execution of Milestone 7 and Phase 1–5 testing, the following fund
 * **Remediation & Model Calibration Note:**
   1. Test harnesses must guarantee complete test drivers with explicit invocation semantics.
   2. For future Hermes agent prompt calibration and fine-tuning: when a script verification step yields empty stdout with exit code 0, the reasoning loop should prioritize verifying function call sites and entrypoints (`__main__`) in the target file before assuming external environment discrepancies.
+
+### Finding 13: Hermes Auxiliary Compression Context Constraint & GLM53_MAXT Calibration (Test 2.1)
+* **Discovery:** During multi-turn repository analysis (Test 2.1), accumulated conversation history and ingested C code expanded context past ~7,500 tokens. Hermes triggered its internal conversation compression evaluation and aborted with exit code 1:
+  `Auxiliary compression model glm-5.3-flash-colibri has a context window of 8,192 tokens, which is below the minimum 64,000 required by Hermes Agent.`
+* **Root Cause Analysis:** In [`c/glm53.c:3439`](file:///workspaces/colibri/c/glm53.c#L3439), slot capacity is read via `GLM53_MAXT` (defaulting to 8,192 if unset), while [`scripts/start_flash_profile.sh`](file:///workspaces/colibri/scripts/start_flash_profile.sh) passed `CTX=65536`. Hermes probed and cached 8,192 in `/root/.hermes/profiles/vibe-flash/context_length_cache.yaml`.
+* **Remediation & Sizing Validation:**
+  1. Configured `GLM53_MAXT=65536` in [`scripts/start_flash_profile.sh`](file:///workspaces/colibri/scripts/start_flash_profile.sh) and pinned `context_length: 65536` in `/root/.hermes/profiles/vibe-flash/config.yaml`.
+  2. Memory Math: GLM-5.3-Flash requires $135.0\text{ KiB/token}$ ($45\text{ MLA layers} \times 768 \times 4\text{ B}$). At 65,536 tokens across 2 slots (`COLI_KV_SLOTS=2`), total KV footprint is $16.88\text{ GiB}$ host RAM, fitting easily within the 91 GiB workstation and preserving **>46 GiB free host RAM** for IsaacLab-Arena and 4K gaming (whereas 1M tokens would require ~276 GiB and cause an instant OOM kill).
+  3. Clean Rerun Execution: Test 2.1 passed with exit code 0 in **62m 00s** (vs 101m 43s on 744B Flagship $\rightarrow$ **1.64× faster / 39m 43s reduction**), processing 78,001 cumulative tokens across 20 messages and 10 tool calls with 100% C code architectural tracing accuracy.
+
 
