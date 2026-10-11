@@ -164,25 +164,60 @@ This phase verifies that every tool and harness primitive operates reliably in i
 ### Test 1.5: In-Place Code Modification via Fuzzy Patching (`patch`)
 * **Objective:** Verify contiguous text patching of an existing file without damaging surrounding code.
 * **Test Commands:**
-  - **GLM-5.3:**
+  - **GLM-5.3 & GLM-5.3-Flash:**
     ```bash
-    echo -e "def calculate(a, b):\n    return a + b\n\ndef main():\n    print(calculate(10, 20))\n" > /tmp/test_patch.py
-    vibe-gaming -z "In /tmp/test_patch.py, use the patch tool to modify calculate() so it multiplies a * b instead of adding, and run it via terminal to verify it prints 200."
+    cat << 'EOF' > /tmp/test_patch.py
+    def calculate(a, b):
+        return a + b
+
+    def main():
+        print(calculate(10, 20))
+
+    if __name__ == "__main__":
+        main()
+    EOF
+    vibe-flash -z "In /tmp/test_patch.py, use the patch tool to modify calculate() so it multiplies a * b instead of adding, and run it via terminal to verify it prints 200."
     ```
-  - **GLM-5.3-Flash:** Identical command via Flash profile.
 * **Success Criteria:** Strict `patch` tool call, clean patch application, terminal verification prints `200`, exit code 0.
+
+> [!IMPORTANT]
+> **Experimental Finding & Agent Behavior Note (Session `224db3` Investigation):**
+> During initial execution of Test 1.5 on GLM-5.3-Flash, `/tmp/test_patch.py` was created without the `if __name__ == "__main__": main()` entrypoint driver. The model successfully applied the `patch` tool on Turn 2 (`return a * b`), but upon running `python3 /tmp/test_patch.py`, stdout returned empty (exit code 0). Because the prompt required verifying that it prints `200`, the agent entered an autonomous multi-turn diagnostic loop troubleshooting Python execution (`echo exit=$?`, `which python3`, `/usr/bin/python3 ...`) rather than inspecting the source file to notice that `main()` was never invoked. This is a critical behavioral and architectural takeaway for future model tuning / agent loop prompting: agents must be instructed or calibrated to verify file entrypoint definitions before assuming shell execution or environment discrepancies.
 
 #### Side-by-Side Comparison: Test 1.5
 | Metric | GLM-5.3 (744B Flagship) | GLM-5.3-Flash (321B MoE) | Comparative Evaluation |
 |---|---|---|---|
-| **Test Status** | **VERIFIED (Empirical)** | **Benchmarking Protocol Ready** | - |
-| **Total Task Duration**| **8m 28s** (`real 8m28.515s`, session `33a16f`) | *Target: 2m 30s–3m 30s* | Projected **~2.5× faster execution** |
-| **Turn Dynamics** | 4 turns (Turn 1: 513 tok prefill; Turn 2-4: <120 tok) | 4 turns with KV prefix reuse | Verify multi-turn speed |
-| **Tool Execution** | 3 tools: `patch` $\rightarrow$ `terminal` $\rightarrow$ final | 3 tools: `patch` $\rightarrow$ `terminal` $\rightarrow$ final | 100% strict tool conformance |
-| **Quality Assessment** | **High:** 0 unclosed tool calls, clean single-line patch | *Target: Strict patch without extra edits* | Test fuzzy matching reliability |
+| **Test Status** | **VERIFIED (Empirical)** | **VERIFIED (Empirical)** | **Parity Verified** |
+| **Total Task Duration**| **8m 28s** (`real 8m28.515s`, session `33a16f`) | **9m 31s** (571.5s in DB, session `3d2082`) | **Comparable Multi-Turn Latency** |
+| **Interactive Tool Loop (Turns 2–4)**| **4m 42s** (282.4s) | **1m 04s** (63.9s) | ⚡ **4.42× Faster Tool Execution** |
+| **Turn Dynamics** | 4 turns (Turn 1: 513 tok prefill; Turn 2-4: <120 tok) | **4 turns** (Turn 1 read, Turn 2 patch, Turn 3 test) | **100% Identical Turn Trajectory** |
+| **Tool Execution** | 3 tools: `read` $\rightarrow$ `patch` $\rightarrow$ `terminal` | **3 tools:** `read` $\rightarrow$ `patch` $\rightarrow$ `terminal` | **100% Strict Tool Conformance** |
+| **Quality Assessment** | **High:** 0 unclosed tool calls, clean single-line patch | **High:** Clean single-line patch, verified stdout `200` | **100% Quality Parity** |
 
 * **GLM-5.3 Detailed Telemetry:**
   - Session `20261010_202621_33a16f` completed cleanly in **8m 28s** (`real 8m28.515s`, 506.6s in DB). Reused 3,273 tokens on Turn 1, patched `calculate()` to `return a * b`, executed test via `terminal` outputting `200`, and verified zero tool errors.
+* **GLM-5.3-Flash Detailed Telemetry:**
+  - Clean rerun session `20261011_190952_3d2082` completed in **9m 31s** (571.5s in DB, wall-clock 571s), executing `read_file` (Turn 1) $\rightarrow$ `patch` converting `return a + b` to `return a * b` (Turn 2) $\rightarrow$ `terminal` running `python3 /tmp/test_patch.py` (Turn 3) printing `200` (exit 0).
+  - Emitted zero syntax or tool errors, achieving complete functional and behavioral parity with GLM-5.3.
+
+#### Forensic Analysis: Why GLM-5.3-Flash Total Duration Was Higher on Test 1.5
+
+A granular timestamp extraction from `/root/.hermes/profiles/vibe-gaming/state.db` and `/root/.hermes/profiles/vibe-flash/state.db` reveals that **GLM-5.3-Flash was actually 4.4× faster during all interactive tool-calling turns**. The slight difference in total session duration (+65 seconds) was entirely an artifact of **Turn 1's Radix KV cache state**:
+
+| Turn | Step Trajectory | GLM-5.3 (744B Flagship) | GLM-5.3-Flash (321B MoE) | Speedup Factor |
+|---|---|---|---|---|
+| **Turn 1** | Prompt & harness prefill $\rightarrow$ `read_file` | **3m 43.7s** (223.7s)<br>*(Warm prefix hit: 3,273 tok)* | **8m 27.4s** (507.4s)<br>*(Full cold prefill: 3,763 tok)* | *Baseline mismatch: warm vs cold* |
+| **Turn 2** | `read_file` return $\rightarrow$ `patch` call | **2m 10.1s** (130.1s) | **29.2s** | ⚡ **4.45× FASTER** |
+| **Turn 3** | `patch` return $\rightarrow$ `terminal` call | **1m 38.3s** (98.3s) | **22.2s** | ⚡ **4.43× FASTER** |
+| **Turn 4** | `terminal` stdout (`200`) $\rightarrow$ final summary | **54.0s** | **12.5s** | ⚡ **4.34× FASTER** |
+| **Turns 2–4** | **Total Interactive Tool Loop** | **4m 42.4s** (282.4s) | **1m 03.9s** (63.9s) | 🚀 **4.42× FASTER** |
+| **Total** | Full session duration | **8m 28s** (506.6s) | **9m 31s** (571.5s) | *+65s due to cold Turn 1 prefill* |
+
+##### Root Cause & Architectural Takeaway:
+1. **The Cold Loading Penalty on Flash:** Prior to the clean run, aborted session `224db3` ran 14 troubleshooting turns (diagnosing the missing `main()` entrypoint in `/tmp/test_patch.py`). This populated KV Slot 0 with divergent context history. When clean session `3d2082` launched, it could not reuse the divergent cache branch and had to execute a **full cold prefill of the 3,763-token agent harness** on Turn 1 (8m 27s).
+2. **Flagship's Artificial Warm Baseline:** In contrast, GLM-5.3 session `33a16f` ran immediately after an identical harness session, matching 3,273 tokens in Radix Slot 0 instantly and prefilling only ~513 delta tokens in 3m 43s (avoiding its native 23m 53s cold prefill cost).
+3. **True Model Velocity:** Once Turn 1 established the prefix, Flash executed the multi-turn tool chain (`read` $\rightarrow$ `patch` $\rightarrow$ `terminal`) in **just 63.9 seconds total** compared to **282.4 seconds** on Flagship (**4.42× faster**).
+4. **Future Calibration Priority:** For high-throughput agent benchmarking, isolated non-interactive CLI runs must manage or pin Slot 0 prefixes (`--kv-slots 2` or stateful sessions) to prevent unneeded ~8.5-minute cold prefills between independent tests.
 
 ---
 
@@ -440,7 +475,7 @@ This phase quantifies low-level streaming line rates, multi-turn speedups, and e
 | **Phase 1** | **1.2** | Single-tool read (`read_file`) | **19m 19s** (1,159.2s, 63 tok)<br>Prefix hit: **0.2s** *(Verified, exit 0)* | **19m 40s** (1,179.7s in DB, session `05f825`, 398 tok)<br>*(Verified, exit 0, strict `read_file`)* | **6.3× higher output tokens**, **6.2× higher output velocity** (0.337 vs 0.054 tok/s), deep double-buffering synthesis |
 | **Phase 1** | **1.3** | File write & terminal exec | **22m 56s** (1,376.0s, 161 tok)<br>*(Verified, exit 0)* | **9m 32s** (571.8s in DB, session `8ee2b6`, 134 tok)<br>*(Verified, exit 0, `write_file` + `terminal`)* | **2.41× faster completion** (571.8s vs 1,376.0s), 100% identical tool execution graph |
 | **Phase 1** | **1.4** | Codebase search (`search_files`) | Diagnostic session `74916c`<br>*(Tool Verified & Hardened)* | **11m 44s** (704.4s in DB, session `ff5be4`, 302 tok)<br>*(Verified, exit 0, `search_files`)* | **Clean first-pass run** (16 matches, 13 files), accurate `vk_tier.h:253` declaration, stub, and 11 call sites |
-| **Phase 1** | **1.5** | Fuzzy code patch (`patch`) | **8m 28s** (`real 8m28.515s`)<br>*(Verified, exit 0)* | Target: **2m 30s–3m 30s**<br>*(Staged & Ready to Run)* | Projected **~2.5× faster execution** |
+| **Phase 1** | **1.5** | Fuzzy code patch (`patch`) | **8m 28s** (`real 8m28.515s`, 4 turns)<br>*(Verified, exit 0)* | **9m 31s** (571.5s in DB, session `3d2082`, 4 turns)<br>*(Verified, exit 0, `read` $\rightarrow$ `patch` $\rightarrow$ `terminal`)* | ⚡ **4.42× faster interactive tool loop** (63.9s vs 282.4s); total duration reflects cold Turn 1 prefill (8m 27s) caused by divergent session eviction |
 | **Phase 2** | **2.1** | Multi-component code analysis | **101m 43s** (`real 101m43.327s`)<br>*(Verified, exit 0)* | Target: **25m–35m**<br>*(Ready to Benchmark)* | Projected **3× to 4× faster deep analysis** |
 | **Phase 2** | **2.2** | Automated test-debug-fix loop | **17m 21s** (`real 17m21.777s`)<br>*(Verified, exit 0)* | Target: **4m 30s–6m 00s**<br>*(Ready to Benchmark)* | Projected **~3× faster fix loop** |
 | **Phase 2** | **2.3** | Git status & diff workflow | **14m 49s** (`real 14m49.112s`)<br>*(Verified, exit 0)* | Target: **3m 30s–4m 30s**<br>*(Ready to Benchmark)* | Projected **~3.5× faster status analysis** |
@@ -510,3 +545,10 @@ During live execution of Milestone 7 and Phase 1–5 testing, the following fund
 * **Dense Trunk VRAM:** Flash requires only ~6.9 GB for its dense trunk vs ~9.9 GB for Flagship, leaving an additional 3 GB VRAM free.
 * **Expert Resident Density:** With 321B total parameters, a larger percentage of routed experts fit within the available 94.36 GiB VRAM pool on dual GPUs, dramatically increasing VRAM cache hits and reducing NVMe streaming misses.
 * **Multimodal Advantage:** Flash incorporates a 24-block ViT image tower, allowing Hermes to visually inspect GUI elements, screenshots, diagrams, and rendered output directly without text-only workarounds.
+
+### Finding 12: Python Script Entrypoint Verification & Agent Diagnostic Divergence (Test 1.5)
+* **Discovery:** During execution of Test 1.5 (`patch`), `/tmp/test_patch.py` was initially populated without invoking the `main()` driver (`if __name__ == "__main__": main()`). The agent's fuzzy patch operation succeeded on Turn 2, correctly converting `return a + b` to `return a * b`. However, upon executing `python3 /tmp/test_patch.py`, Python naturally exited 0 with empty stdout. Prompted to "verify it prints 200", the agent entered a multi-turn troubleshooting loop diagnosing terminal execution environment issues (`echo exit=$?`, `which python3`, `/usr/bin/python3 ...`) rather than re-reading the source code to verify entrypoint execution.
+* **Remediation & Model Calibration Note:**
+  1. Test harnesses must guarantee complete test drivers with explicit invocation semantics.
+  2. For future Hermes agent prompt calibration and fine-tuning: when a script verification step yields empty stdout with exit code 0, the reasoning loop should prioritize verifying function call sites and entrypoints (`__main__`) in the target file before assuming external environment discrepancies.
+
