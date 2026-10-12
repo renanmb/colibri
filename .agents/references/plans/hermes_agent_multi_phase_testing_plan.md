@@ -1,8 +1,8 @@
 # Multi-Phase Testing & Verification Plan: Hermes Agent on GLM-5.3 (744B) vs. GLM-5.3-Flash (321B)
 
 This document establishes the comprehensive, multi-phase verification and side-by-side comparative benchmarking protocol for **Hermes Agent** operating against:
-1. **GLM-5.3 (744B MoE Flagship):** Running via the primary Colibrì engine ([`c/colibri.c`](file:///workspaces/colibri/c/colibri.c)) with dual-NVMe striped mirroring.
-2. **GLM-5.3-Flash (321B Multimodal MoE):** Running via the optimized Flash engine ([`c/glm53.c`](file:///workspaces/colibri/c/glm53.c)) with native vision support.
+1. **GLM-5.3 (744B MoE Flagship):** Running via the primary Colibrì engine ([`c/colibri.c`](../../../c/colibri.c)) with dual-NVMe striped mirroring.
+2. **GLM-5.3-Flash (321B Multimodal MoE):** Running via the optimized Flash engine ([`c/glm53.c`](../../../c/glm53.c)) with native vision support.
 
 The objective is to compare both models across the identical battery of tests to evaluate **task completion time**, **latency speedup**, **quality of reasoning/answers**, and **operational feasibility** under the workstation gaming profile.
 
@@ -32,10 +32,10 @@ The testing protocol spans five progressive phases:
 |---|---|---|
 | **Total Parameter Count** | **744 Billion** | **321 Billion** |
 | **Catalog ID / Family** | `glm-5.3` (family: `glm`) | `glm53` (family: `glm53`) |
-| **Engine Binary** | [`c/colibri`](file:///workspaces/colibri/c/colibri) (`c/colibri.c`) | [`c/glm53`](file:///workspaces/colibri/c/glm53) (`c/glm53.c`) |
-| **Model Directory** | [`/models/glm-5.3`](file:///models/glm-5.3) | [`/models/glm-5.3-flash`](file:///models/glm-5.3-flash) |
+| **Engine Binary** | [`c/colibri`](../../../c/colibri) (`c/colibri.c`) | [`c/glm53`](../../../c/glm53) (`c/glm53.c`) |
+| **Model Directory** | `/models/glm-5.3` | `/models/glm-5.3-flash` |
 | **Disk Storage / Shards** | **419.3 GB** (141 safetensors shards) | **182.0 GB** (62 safetensors shards) |
-| **Dual-NVMe Mirroring** | Active on [`models_mirror/glm-5.3`](file:///workspaces/colibri/models_mirror/glm-5.3) (16.16 GB/s) | Direct on `/models/glm-5.3-flash` (or optional mirror) |
+| **Dual-NVMe Mirroring** | Active on [`models_mirror/glm-5.3`](../../../models_mirror/glm-5.3) (16.16 GB/s) | Direct on `/models/glm-5.3-flash` (or optional mirror) |
 | **Modalities** | Text, Code, Complex Reasoning, Tools | **Vision (24-block ViT)**, Text, Code, Tools |
 | **Dense Trunk Memory** | ~9.9 GB VRAM | ~6.9 GB VRAM |
 | **Resident VRAM Experts** | 4,060 resident experts (62 GB on GPU 0 + 23 GB on GPU 1) | Higher expert VRAM percentage due to smaller expert size |
@@ -141,7 +141,7 @@ This phase verifies that every tool and harness primitive operates reliably in i
 * **Test Commands:**
   - **GLM-5.3:** `vibe-gaming -z "Search for 'vkt_stream_prefetch' in the c/ directory, and report the files, line numbers, and its declaration signature."`
   - **GLM-5.3-Flash:** `vibe-flash -z "Search for 'vkt_stream_prefetch' in the c/ directory, and report the files, line numbers, and its declaration signature."`
-* **Success Criteria:** Structured `search_files` call, returns matches in [`c/vk_tier.h`](file:///workspaces/colibri/c/vk_tier.h), exit code 0.
+* **Success Criteria:** Structured `search_files` call, returns matches in [`c/vk_tier.h`](../../../c/vk_tier.h), exit code 0.
 
 #### Side-by-Side Comparison: Test 1.4
 | Metric | GLM-5.3 (744B Flagship) | GLM-5.3-Flash (321B MoE) | Comparative Evaluation |
@@ -287,7 +287,7 @@ This phase verifies multi-file reasoning, test-driven debugging, and repository 
   - Session `20261010_223557_4c68b8` completed in **17m 21s** (1,039.9s in DB) across 14 messages and 6 tool calls. Recovered from missing `python` binary, computed matrix product, applied a single-line patch, and verified test passage.
 * **GLM-5.3-Flash Detailed Telemetry:**
   - Session `20261011_212106_bd9a34` completed cleanly in **28m 09s** (1,689.28s in DB) across 10 messages and **only 4 tool calls** (`terminal` $\rightarrow$ `read_file` $\rightarrow$ `patch` $\rightarrow$ `terminal`, exit code 0).
-  - Executed cleanly on the first pass with `python3`, captured the `AssertionError: Matrix multiplication failed`, read [`/tmp/test_matrix.py`](file:///tmp/test_matrix.py), computed the exact dot product ($1\times5 + 2\times7 = 19$), applied an in-place patch on line 6, re-ran the script, and confirmed `ALL TESTS PASSED`.
+  - Executed cleanly on the first pass with `python3`, captured the `AssertionError: Matrix multiplication failed`, read `/tmp/test_matrix.py`, computed the exact dot product ($1\times5 + 2\times7 = 19$), applied an in-place patch on line 6, re-ran the script, and confirmed `ALL TESTS PASSED`.
   - Turns 2–3 interactive tool loop ran in **91.7s total** (Turn 2 read in 25.7s, Turn 3 patch in 66.0s). Zero syntax errors, zero tool retries.
 
 ---
@@ -313,7 +313,7 @@ This phase verifies multi-file reasoning, test-driven debugging, and repository 
   - Session `20261010_225614_15f2b7` completed in **14m 49s** (887.3s in DB) across 4 messages, generating a compliant commit message on a minimal 500-byte diff.
 * **GLM-5.3-Flash Detailed Telemetry:**
   - Session `20261011_215944_a4367d` completed cleanly in **50m 15s** (3,014.61s in DB, exit 0), generating 625 output tokens across 4 messages and 1 tool call.
-  - Ingested 36,236 characters (~9,500 tokens) of git diff output across [`hermes_agent_multi_phase_testing_plan.md`](file:///workspaces/colibri/.agents/references/plans/hermes_agent_multi_phase_testing_plan.md) and [`nvme_memory_and_vram_optimization_plan.md`](file:///workspaces/colibri/.agents/references/plans/nvme_memory_and_vram_optimization_plan.md).
+  - Ingested 36,236 characters (~9,500 tokens) of git diff output across [`hermes_agent_multi_phase_testing_plan.md`](hermes_agent_multi_phase_testing_plan.md) and [`nvme_memory_and_vram_optimization_plan.md`](nvme_memory_and_vram_optimization_plan.md).
   - Correctly decomposed both plan diffs, summarized the Test 2.2 results and the 5 DisplayPort / USB bus lock / PCIe diagnostic runbooks, and produced a structured Conventional Commit message (`docs(plans): record Test 2.2 flash benchmark results and add display/PCIe remediation runbooks`).
   - Explicitly recognized and obeyed the repository git constraint: *"Note: per the repo's strict policy I haven't staged or committed anything — run git add / git commit yourself when ready."*
 * **Forensic Duration Analysis (Why Flash took 50m 15s vs 14m 49s on Flagship):**
@@ -574,9 +574,9 @@ During live execution of Milestone 7 and Phase 1–5 testing, the following fund
 ### Finding 13: Hermes Auxiliary Compression Context Constraint & GLM53_MAXT Calibration (Test 2.1)
 * **Discovery:** During multi-turn repository analysis (Test 2.1), accumulated conversation history and ingested C code expanded context past ~7,500 tokens. Hermes triggered its internal conversation compression evaluation and aborted with exit code 1:
   `Auxiliary compression model glm-5.3-flash-colibri has a context window of 8,192 tokens, which is below the minimum 64,000 required by Hermes Agent.`
-* **Root Cause Analysis:** In [`c/glm53.c:3439`](file:///workspaces/colibri/c/glm53.c#L3439), slot capacity is read via `GLM53_MAXT` (defaulting to 8,192 if unset), while [`scripts/start_flash_profile.sh`](file:///workspaces/colibri/scripts/start_flash_profile.sh) passed `CTX=65536`. Hermes probed and cached 8,192 in `/root/.hermes/profiles/vibe-flash/context_length_cache.yaml`.
+* **Root Cause Analysis:** In [`c/glm53.c:3439`](../../../c/glm53.c#L3439), slot capacity is read via `GLM53_MAXT` (defaulting to 8,192 if unset), while [`scripts/start_flash_profile.sh`](../../../scripts/start_flash_profile.sh) passed `CTX=65536`. Hermes probed and cached 8,192 in `/root/.hermes/profiles/vibe-flash/context_length_cache.yaml`.
 * **Remediation & Sizing Validation:**
-  1. Configured `GLM53_MAXT=65536` in [`scripts/start_flash_profile.sh`](file:///workspaces/colibri/scripts/start_flash_profile.sh) and pinned `context_length: 65536` in `/root/.hermes/profiles/vibe-flash/config.yaml`.
+  1. Configured `GLM53_MAXT=65536` in [`scripts/start_flash_profile.sh`](../../../scripts/start_flash_profile.sh) and pinned `context_length: 65536` in `/root/.hermes/profiles/vibe-flash/config.yaml`.
   2. Memory Math: GLM-5.3-Flash requires $135.0\text{ KiB/token}$ ($45\text{ MLA layers} \times 768 \times 4\text{ B}$). At 65,536 tokens across 2 slots (`COLI_KV_SLOTS=2`), total KV footprint is $16.88\text{ GiB}$ host RAM, fitting easily within the 91 GiB workstation and preserving **>46 GiB free host RAM** for IsaacLab-Arena and 4K gaming (whereas 1M tokens would require ~276 GiB and cause an instant OOM kill).
   3. Clean Rerun Execution: Test 2.1 passed with exit code 0 in **62m 00s** (vs 101m 43s on 744B Flagship $\rightarrow$ **1.64× faster / 39m 43s reduction**), processing 78,001 cumulative tokens across 20 messages and 10 tool calls with 100% C code architectural tracing accuracy.
 
@@ -588,7 +588,7 @@ During live execution of Milestone 7 and Phase 1–5 testing, the following fund
   4. **USB Interrupt Storm & Split-Lock Sleep Penalties:** The 1000Hz gaming mouse on the monitor hub generated >262M interrupts on IRQ 82 via Chipset 1, triggering `#DB` split locks and kernel `msleep` penalties that froze PCIe DMA scanout.
 * **Remediation Implemented & Cross-Referenced:**
   1. *Immediate:* Disabled split-lock penalty delays (`kernel.split_lock_mitigate=0`) and locked memory clocks (`nvidia-smi -lmc 14001,14001` during compute).
-  2. *Engine Launcher:* Rebalanced [`scripts/start_gaming_profile.sh`](file:///workspaces/colibri/scripts/start_gaming_profile.sh) with `COLI_VK_TIER_GB=38.0`, `COLI_VK_TIER_RESERVE_GB=14.0`, `COLI_VK_CHAIN_ROWS=128`, and `COLI_VK_EXPERTS2=1800` (~50/50 compute split across GPUs).
-  3. *Physical Migration Runbook:* Fully detailed in [`.agents/references/plans/motherboard_usb_and_pcie_topology_plan.md`](file:///workspaces/colibri/.agents/references/plans/motherboard_usb_and_pcie_topology_plan.md) and Section 8 of [`.agents/references/plans/nvme_memory_and_vram_optimization_plan.md`](file:///workspaces/colibri/.agents/references/plans/nvme_memory_and_vram_optimization_plan.md) (relocating peripherals to Ports 9 & 11, moving NVMe 1 to `M.2_4`/`M.2_5`, and seating GPU 1 in `PCIEX16(G5)_2` with `[x8/x8 Mode]` bifurcation).
+  2. *Engine Launcher:* Rebalanced [`scripts/start_gaming_profile.sh`](../../../scripts/start_gaming_profile.sh) with `COLI_VK_TIER_GB=38.0`, `COLI_VK_TIER_RESERVE_GB=14.0`, `COLI_VK_CHAIN_ROWS=128`, and `COLI_VK_EXPERTS2=1800` (~50/50 compute split across GPUs).
+  3. *Physical Migration Runbook (Host Operator Manual Actions — Not Executable Inside Devcontainer):* Fully detailed in [`motherboard_usb_and_pcie_topology_plan.md`](motherboard_usb_and_pcie_topology_plan.md) and Section 8 of [`nvme_memory_and_vram_optimization_plan.md`](nvme_memory_and_vram_optimization_plan.md) (relocating peripherals to Ports 9 & 11, moving NVMe 1 to `M.2_4`/`M.2_5`, and seating GPU 1 in `PCIEX16(G5)_2` with `[x8/x8 Mode]` bifurcation).
 
 

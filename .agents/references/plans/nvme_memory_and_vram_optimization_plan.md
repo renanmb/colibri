@@ -1,11 +1,17 @@
 # Colibrì GLM-5.3 Hardware Acceleration & NVMe / VRAM / Clock Optimization Plan
 
 **Document Path:** `.agents/references/plans/nvme_memory_and_vram_optimization_plan.md`  
-**Companion Topology Plan:** [`.agents/references/plans/motherboard_usb_and_pcie_topology_plan.md`](file:///workspaces/colibri/.agents/references/plans/motherboard_usb_and_pcie_topology_plan.md)  
+**Companion Topology Plan:** [`motherboard_usb_and_pcie_topology_plan.md`](motherboard_usb_and_pcie_topology_plan.md)  
 **Date:** October 11, 2026  
 **Target Architecture:** Dual-GPU (RTX PRO 6000 96 GB + RTX 5090 32 GB), Dual-PCIe Gen 5 NVMe SSDs (Samsung 9100 PRO), Linux x86_64  
 **Target Model:** GLM-5.3 (744B Mixture-of-Experts, 141 safetensors shards, 419.3 GB, 9,984 total experts)  
-**Profile Launcher:** [`scripts/start_gaming_profile.sh`](file:///workspaces/colibri/scripts/start_gaming_profile.sh)
+**Profile Launcher:** [`scripts/start_gaming_profile.sh`](../../../scripts/start_gaming_profile.sh)
+
+> [!NOTE]
+> **Devcontainer Environment Notice:**
+> Inference execution and software profiling run inside a Docker Devcontainer (`/workspaces/colibri`).
+> Any physical hardware tasks described herein (such as motherboard peripheral re-cabling, USB port shifts, PCIe card reseating, and BIOS setup changes) cannot be executed inside the container and must be performed by the human operator on the physical workstation.
+
 
 ---
 
@@ -97,7 +103,7 @@ df -h /mnt/models_fast
 
 ### 2.3 Display Pipeline & Monitor Interconnect Matrix
 
-Through direct EDID parsing of [`/sys/class/drm/card0-DP-3/edid`](file:///sys/class/drm/card0-DP-3/edid) and USB topology scanning, the physical display subsystem was mapped:
+Through direct EDID parsing of `/sys/class/drm/card0-DP-3/edid` and USB topology scanning, the physical display subsystem was mapped:
 
 | Subsystem Component | Hardware Specification | Measured / Empirical State | Failure Impact & Vulnerability |
 | :--- | :--- | :--- | :--- |
@@ -352,7 +358,7 @@ grep -E "COLI_VK_STAGED=1|COLI_VK_CHAIN_ROWS=128" scripts/start_gaming_profile.s
 
 #### 1. The `KV8=0` vs `KV8=1` Architectural Trade-Off:
 - **`KV8=1` (FP8 KV Cache):** Quantizes KV cache to `fp8 e4m3` with per-row f32 scaling, cutting KV RAM by ~3.9×. This is effective for short interactive CLI chat prompts (5–10 tokens in `./coli chat`).
-- **`KV8=0` (Native FP32) — Strictly Required for Hermes Agent:** In [`c/glm_chain.h` Line 722](file:///workspaces/colibri/c/glm_chain.h#L720-L723), the engine's Vulkan shaders for MLA attention only support native FP32 KV tensors. If `KV8=1` is passed, the engine drops dense attention back to the CPU:
+- **`KV8=0` (Native FP32) — Strictly Required for Hermes Agent:** In [`c/glm_chain.h` Line 722](../../../c/glm_chain.h#L720-L723), the engine's Vulkan shaders for MLA attention only support native FP32 KV tensors. If `KV8=1` is passed, the engine drops dense attention back to the CPU:
   ```text
   [VK] colibri: a quantized KV cache (KV8, KV_TQ) stays on the CPU: the dense chain stays off
   [VK] colibri: dense weights on the device and in host RAM (the dense part runs on the CPU)
@@ -390,7 +396,7 @@ Launch Colibrì with multiple dedicated KV slots (`--kv-slots 2` or `--kv-slots 
 - **Slot 1:** Absorbs short auxiliary turns, grammar rule enforcements (235 tokens), and tool health checks without touching Slot 0.
 
 #### 3. Verification & Result:
-In [`c/openai_server.py`](file:///workspaces/colibri/c/openai_server.py#L3901), requests are hashed across slots (`conversation_cache_slot(conversation, kv_slots)`).
+In [`c/openai_server.py`](../../../c/openai_server.py#L3901), requests are hashed across slots (`conversation_cache_slot(conversation, kv_slots)`).
 * **Result:** Slot 0 is never evicted by auxiliary calls. Subsequent turns achieve **100% KV prefix reuse (`prefix 3759/3759, prefill 0`)**, locking turnaround times into **10–20 seconds**.
 
 ---
@@ -432,18 +438,21 @@ During live diagnostics, screen blanking (1–3 second black screens or "No Sign
 
 ##### Step 2: Enforce Strict VRAM Headroom on GPU 0 (`COLI_VK_TIER_RESERVE_GB=14.0+`)
 * **The Vulnerability:** Native 4K UHD (3840×2160) @ 120Hz with HDR and ray tracing dynamically demands **10 to 18 GB** of dedicated VRAM for framebuffers, G-buffers, BVH trees, and mipmaps. If Colibrì consumes 79.7 GB, leaving only 7.6 GB free, the system immediately trips `VK_ERROR_OUT_OF_DEVICE_MEMORY` or `DXGI_ERROR_DEVICE_REMOVED`, blanking the screen.
-* **The Solution:** Set `COLI_VK_TIER_RESERVE_GB=14.0` in [`scripts/start_gaming_profile.sh`](file:///workspaces/colibri/scripts/start_gaming_profile.sh). This caps Colibrì's resident expert allocation on GPU 0, preserving **$\ge 24.4$ GB of completely unallocated VRAM** for games and desktop compositing.
+* **The Solution:** Set `COLI_VK_TIER_RESERVE_GB=14.0` in [`scripts/start_gaming_profile.sh`](../../../scripts/start_gaming_profile.sh). This caps Colibrì's resident expert allocation on GPU 0, preserving **$\ge 24.4$ GB of completely unallocated VRAM** for games and desktop compositing.
 
 ##### Step 3: Bounded Forward Dispatch Chunks (`COLI_VK_CHAIN_ROWS=128`)
 * **The Vulnerability:** At 120 Hz, each frame has an uncompromising **8.33 ms** budget. If compute kernels hold the command processor for $>20\text{ ms}$, the scanout FIFO underruns. DSC hardware cannot recover mid-frame and drops the connection. In addition, unyielded dispatches trip the Linux Xorg/Wayland TDR watchdog timer.
 * **The Solution:** Enforce `COLI_VK_CHAIN_ROWS=128`. Each forward step completes in bounded chunks ($\le 4\text{ ms}$), interleaving compute with graphics render passes without missing VBlank.
 
 ##### Step 4: Relocate Gaming Peripherals from Monitor Hub to CPU-Direct USB Ports
+> [!NOTE]
+> **Host Physical Hardware Step (Not executable inside Devcontainer):**
+> Because this environment runs in a Docker Devcontainer, the agent cannot physically interact with motherboard ports or peripheral cables. This step must be performed directly by the host human operator.
 * **The Vulnerability:** Kernel logs revealed over **262 million interrupts** on IRQ 82 due to the Razer DeathAdder Elite (1000Hz polling) and Corsair keyboard plugged into the Dell S3225QC's integrated ASMedia hub, routing through the AMD Promontory 21 chipset (`0000:0f:00.0`). The resulting xHCI buffer overruns triggered `x86/split lock detection: #DB took a bus_lock trap`, freezing PCIe DMA and starving the GPU's display engine.
 * **The Solution:**
   1. Unplug gaming mouse and keyboard from the Dell monitor's downstream USB ports.
   2. Connect them directly to **Ports 9 and 11 (the two native AMD CPU-direct USB 3.2 Gen 2 Type-A ports located immediately below the HDMI port)** on the motherboard rear I/O shield (Controllers `0000:7c:00.3` and `0000:7c:00.4`).
-  3. See full port layout schematic in [`.agents/references/plans/motherboard_usb_and_pcie_topology_plan.md`](file:///workspaces/colibri/.agents/references/plans/motherboard_usb_and_pcie_topology_plan.md).
+  3. *(Host Operator Action — Manual Physical Step)*: See full port layout schematic in [`motherboard_usb_and_pcie_topology_plan.md`](motherboard_usb_and_pcie_topology_plan.md).
   4. Mitigate split-lock kernel handling immediately:
      ```bash
      sudo sysctl -w kernel.split_lock_mitigate=0
@@ -462,7 +471,7 @@ During live diagnostics, screen blanking (1–3 second black screens or "No Sign
   Code auditing of `c/vk_tier.c` (lines 453-458) revealed that Colibrì strictly fills Device 0 (`T.dmax[0]`) before sending any experts to Device 1. Because `COLI_VK_TIER_GB` was set to `70.0` on the 96 GB RTX PRO 6000, GPU 0 held over 2,900 resident experts—virtually the entire active working set of GLM-5.3!
   As a result, Colibrì routed **96.8% of all expert compute jobs to GPU 0** (`10,611,002 of 10,957,632 routed experts`), executing over 1.22 million matrix multiplications per turn on the display card while GPU 1 (RTX 5090) sat idle at 0%–14% SM. This massive compute backlog locked the hardware pushbuffer, preventing the Linux compositor from acquiring presentation execution slots.
 * **The Solution:**
-  In [`scripts/start_gaming_profile.sh`](file:///workspaces/colibri/scripts/start_gaming_profile.sh):
+  In [`scripts/start_gaming_profile.sh`](../../../scripts/start_gaming_profile.sh):
   1. Set `COLI_VK_TIER_GB=38.0` (caps GPU 0 at ~1500 experts).
   2. Set `COLI_VK_TIER_RESERVE_GB=14.0` (guarantees $\ge 14\text{ GB}$ of free VRAM for 4K 120Hz compositing and games).
   3. Set `COLI_VK_EXPERTS2=1800` (allocates 1800 experts onto GPU 1's 32 GB VRAM).
@@ -757,7 +766,7 @@ During live multi-turn execution of GLM-5.3 and Hermes Agent under concurrent 4K
 
 #### Mechanism 1: GPU 0 Compute Queue Monopolization & Display Present Starvation
 * **The Empirical Proof (Scans 6, 7 & 9):**
-  * In [`/root/.local/share/colibri/logs/serve.log`](file:///root/.local/share/colibri/logs/serve.log), Colibrì recorded:
+  * In `/root/.local/share/colibri/logs/serve.log`, Colibrì recorded:
     ```text
     [VK] tier glm53 turn: device 10,611,002 of 10,957,632 routed experts (96.8%)
     [VK] balance: device share 0.78
@@ -786,7 +795,7 @@ During live multi-turn execution of GLM-5.3 and Hermes Agent under concurrent 4K
 * **The Empirical Proof (Scan 8):**
   * Inspecting the inference process PID (`glm53`) revealed **570,310 involuntary context switches** (`nonvoluntary_ctxt_switches`), climbing by thousands of switches per minute.
 * **Impact on DisplayPort:**
-  * In [`c/backend_vulkan.c`](file:///workspaces/colibri/c/backend_vulkan.c#L2005), `vk_fence_wait_gemm` spins on the CPU for up to 50,000 $\mu$s (50 ms).
+  * In [`c/backend_vulkan.c`](../../../c/backend_vulkan.c#L2005), `vk_fence_wait_gemm` spins on the CPU for up to 50,000 $\mu$s (50 ms).
   * This busy-wait loop consumes CPU cycles without yielding, prompting the Linux Completely Fair Scheduler (CFS) to forcibly preempt the engine's worker threads. These forced preemptions disrupt timely draw-call submission for both the background LLM and the foreground desktop compositor.
 
 #### Mechanism 4: VRAM Headroom Contention on the Display Adapter
@@ -863,7 +872,7 @@ Use this complete step-by-step runbook when you are ready to reboot and service 
    *(Already executed and active!)*
 
 2. **Launcher Profile Verification:**
-   Verify that [`scripts/start_gaming_profile.sh`](file:///workspaces/colibri/scripts/start_gaming_profile.sh) has:
+   Verify that [`scripts/start_gaming_profile.sh`](../../../scripts/start_gaming_profile.sh) has:
    * `COLI_VK_TIER_GB=38.0`
    * `COLI_VK_TIER_RESERVE_GB=14.0`
    * `COLI_VK_CHAIN_ROWS=128`
@@ -872,6 +881,11 @@ Use this complete step-by-step runbook when you are ready to reboot and service 
 ---
 
 ### Phase B: Physical Hardware Migration (Workstation Powered Completely Off)
+
+> [!WARNING]
+> **Host Physical Hardware Procedure (Not Executable Inside Devcontainer):**
+> Phases B and C require physical computer shutdown, manual peripheral re-cabling, PCIe and M.2 hardware moves, and ASUS UEFI BIOS configuration.
+> These steps cannot be performed by the agent inside the Devcontainer and must be executed directly by the human workstation operator.
 
 1. **Relocate Gaming Peripherals to CPU-Direct Ports:**
    * **Mouse (Razer 1000Hz):** Unplug from Dell monitor hub $\rightarrow$ Plug into **Port 9 (USB 10G Type-A)** directly below the HDMI port on the motherboard rear I/O.

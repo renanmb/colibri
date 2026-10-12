@@ -13,6 +13,9 @@
   - Inside the devcontainer, `/models` maps directly to this filesystem.
   - Never download models to `/root` or `/workspaces` — always store them in `/models`!
 - **Git Restrictions (STRICT BAN):** The agent is strictly forbidden from executing `git commit` or `git push`. All staging, committing, and pushing must be performed manually by the human user.
+- **Physical Hardware Execution Scope:** Because execution takes place inside a Docker devcontainer, the agent CANNOT execute physical hardware procedures (e.g. motherboard rear I/O peripheral re-cabling, USB port relocations, PCIe card reseating, BIOS/UEFI updates). Such procedures are manual reference guides for the human operator on the physical host machine.
+- **Documentation Link References:** Documentation files must use standard relative links (e.g. `[label](./relative/path.md)`) instead of absolute `file:///workspaces/colibri/...` URIs.
+
 
 ---
 

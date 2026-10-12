@@ -3,13 +3,13 @@
 **Document Path:** `.agents/references/notes/recommended_next_steps.md`  
 **Date:** October 11, 2026  
 **Status:** Post-Testing Milestone Roadmap  
-**Related Reference:** [`.agents/references/plans/hermes_agent_multi_phase_testing_plan.md`](file:///workspaces/colibri/.agents/references/plans/hermes_agent_multi_phase_testing_plan.md)
+**Related Reference:** [`hermes_agent_multi_phase_testing_plan.md`](../plans/hermes_agent_multi_phase_testing_plan.md)
 
 ---
 
 ## 1. Executive Summary: Milestone Completion
 
-With the conclusion and verification of all five testing phases in the [Hermes Agent Multi-Phase Testing Plan](file:///workspaces/colibri/.agents/references/plans/hermes_agent_multi_phase_testing_plan.md), the entire local stack (**Colibrì C engine + GLM-5.3 744B MoE + Dual-GPU Vulkan tiering + Dual-NVMe storage streaming + Hermes Agent harness**) has been proven reliable, resource-isolated, and production-ready:
+With the conclusion and verification of all five testing phases in the [Hermes Agent Multi-Phase Testing Plan](../plans/hermes_agent_multi_phase_testing_plan.md), the entire local stack (**Colibrì C engine + GLM-5.3 744B MoE + Dual-GPU Vulkan tiering + Dual-NVMe storage streaming + Hermes Agent harness**) has been proven reliable, resource-isolated, and production-ready:
 
 * **15 of 15 Tests Verified:** 100% pass rate across core primitives, autonomous engineering loops, stateful interactive UX, long-context scaling (>10k tokens), concurrent 3D rendering stress, and telemetry line rates.
 * **Workstation Isolation Guaranteed:** 24.4 GiB free VRAM permanently unallocated on GPU 0; 8 CPU worker threads strictly bounded to `nice -n 12`.
@@ -67,7 +67,7 @@ The remaining 85 shards have been copied to `/dev/nvme0` (`/workspaces/colibri/m
 * **Disk Headroom:** `/dev/nvme0n1p2` preserves **816 GB of free space** (77% utilization).
 
 ### Live Engine Telemetry & Measured Bandwidth
-Upon server restart via [`scripts/start_gaming_profile.sh`](file:///workspaces/colibri/scripts/start_gaming_profile.sh), Colibrì detected the complete 141-shard replica and executed its live bandwidth probe:
+Upon server restart via [`scripts/start_gaming_profile.sh`](../../../scripts/start_gaming_profile.sh), Colibrì detected the complete 141-shard replica and executed its live bandwidth probe:
 ```text
 [MIRROR] /workspaces/colibri/models_mirror/glm-5.3: 141/141 shards (replica 1)
 [MIRROR] probe: primary 7.38 GB/s | mirror 8.78 GB/s
@@ -101,10 +101,10 @@ While GLM-5.3 (744B) is your flagship heavy-duty reasoning engine, **GLM-5.3-Fla
 
 ### Download Status & Storage Verification (COMPLETED)
 * **Download Status:** **100% Complete & Verified** via `huggingface-cli` (`task-3788` completed in 25m 30s).
-* **Storage Location:** [`/models/glm-5.3-flash`](file:///models/glm-5.3-flash) (on host: `/mnt/models_fast/glm-5.3-flash`).
+* **Storage Location:** `/models/glm-5.3-flash` (on host: `/mnt/models_fast/glm-5.3-flash`).
 * **Disk Footprint:** **182 GB** across 62 safetensors shards (all valid).
 * **Model Health Check:** Verified via `python3 c/coli doctor --model /models/glm-5.3-flash` (configuration, tokenizer, family registry, and shard headers all passing).
-* **Engine Binary:** [`c/glm53`](file:///workspaces/colibri/c/glm53) compiled and ready with native AVX-512 and Vulkan acceleration.
+* **Engine Binary:** [`c/glm53`](../../../c/glm53) compiled and ready with native AVX-512 and Vulkan acceleration.
 * **Storage Headroom:** **3.0 TB free space remaining** on `/dev/nvme1n1p1`.
 
 ### Use Case & Multimodal Extension

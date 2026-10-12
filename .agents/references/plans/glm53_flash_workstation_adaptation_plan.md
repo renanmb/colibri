@@ -1,11 +1,11 @@
 # Colibrì GLM-5.3-Flash Maximized Dual-GPU Workstation Adaptation Plan
 
-**Document Path:** [`.agents/references/plans/glm53_flash_workstation_adaptation_plan.md`](file:///workspaces/colibri/.agents/references/plans/glm53_flash_workstation_adaptation_plan.md)  
+**Document Path:** `.agents/references/plans/glm53_flash_workstation_adaptation_plan.md`  
 **Date:** October 11, 2026  
 **Target Hardware:** Dual-GPU (NVIDIA RTX PRO 6000 Blackwell 96 GB + RTX 5090 32 GB), 91 GiB Host RAM, Dual-PCIe Gen 5 NVMe (Samsung 9100 PRO)  
 **Target Model:** GLM-5.3-Flash (321B Multimodal MoE, 182 GB safetensors, 62 shards on `/models/glm-5.3-flash`)  
-**Engine Binary:** [`c/glm53`](file:///workspaces/colibri/c/glm53) (compiled with `VK=1 ARCH=native`)  
-**Profile Launcher:** [`scripts/start_flash_profile.sh`](file:///workspaces/colibri/scripts/start_flash_profile.sh)
+**Engine Binary:** [`c/glm53`](../../../c/glm53) (compiled with `VK=1 ARCH=native`)  
+**Profile Launcher:** [`scripts/start_flash_profile.sh`](../../../scripts/start_flash_profile.sh)
 
 ---
 
@@ -76,7 +76,7 @@ The resource budget is strictly partitioned to guarantee headroom for high-load 
 
 ## 4. Key Configuration Knobs for Maximum GPU Saturation
 
-To enforce these maximized boundaries and prevent OOM kills, [`scripts/start_flash_profile.sh`](file:///workspaces/colibri/scripts/start_flash_profile.sh) must configure:
+To enforce these maximized boundaries and prevent OOM kills, [`scripts/start_flash_profile.sh`](../../../scripts/start_flash_profile.sh) must configure:
 
 ```bash
 # 1. System Host RAM Bounding (CRITICAL FIX FOR OOM KILLER)
@@ -142,12 +142,12 @@ During the multi-phase benchmarking of GLM-5.3-Flash against Hermes Agent (speci
   which is below the minimum 64,000 required by Hermes Agent. Choose a compression model with at least 64K context
   (set auxiliary.compression.model in config.yaml), or set auxiliary.compression.context_length to override the detected value.
   ```
-* **Root Cause 1 (Colibrì Engine Context Env Var):** In [`c/glm53.c:3439`](file:///workspaces/colibri/c/glm53.c#L3439) and [`c/family_registry.py:1279`](file:///workspaces/colibri/c/family_registry.py#L1279), the context length setting is read via `GLM53_MAXT`:
+* **Root Cause 1 (Colibrì Engine Context Env Var):** In [`c/glm53.c:3439`](../../../c/glm53.c#L3439) and [`c/family_registry.py:1279`](../../../c/family_registry.py#L1279), the context length setting is read via `GLM53_MAXT`:
   ```c
   const char *context = getenv("GLM53_MAXT");
   g_slot_context = context ? atoi(context) : 8192;
   ```
-  The initial profile script [`scripts/start_flash_profile.sh`](file:///workspaces/colibri/scripts/start_flash_profile.sh) passed `CTX=65536`, but omitted `GLM53_MAXT=65536`. As a result, the engine initialized with `g_slot_context = 8,192`.
+  The initial profile script [`scripts/start_flash_profile.sh`](../../../scripts/start_flash_profile.sh) passed `CTX=65536`, but omitted `GLM53_MAXT=65536`. As a result, the engine initialized with `g_slot_context = 8,192`.
 * **Root Cause 2 (Hermes Persistent Cache & Profile Config):** Hermes probed the local endpoint, observed the 8,192 ceiling, and recorded it in `/root/.hermes/profiles/vibe-flash/context_length_cache.yaml`. In `/root/.hermes/profiles/vibe-flash/config.yaml`, `model.context_length` and `auxiliary.compression.context_length` were left commented out, relying on auto-detection.
 
 ### 6.2 Context Window Sizing: Why 64K / 65K Tokens is the Optimal Operating Point
@@ -164,7 +164,7 @@ The GLM-5.3-Flash model card declares theoretical RoPE support up to 1,048,576 t
 ### 6.3 Required Profile & Harness Modifications
 To align Colibrì and Hermes Agent with the 64K token requirement:
 
-1. **Update [`scripts/start_flash_profile.sh`](file:///workspaces/colibri/scripts/start_flash_profile.sh):**
+1. **Update [`scripts/start_flash_profile.sh`](../../../scripts/start_flash_profile.sh):**
    ```bash
    export GLM53_MAXT=65536
    export CTX=65536
@@ -345,7 +345,7 @@ grep -E "VK glm53 chain:.*ms waiting for the device" /root/.local/share/colibri/
 
 To permanently resolve the DisplayPort signal dropouts:
 
-1. **Remove Forced Memory Clock Lock in [`scripts/start_flash_profile.sh`](file:///workspaces/colibri/scripts/start_flash_profile.sh):**
+1. **Remove Forced Memory Clock Lock in [`scripts/start_flash_profile.sh`](../../../scripts/start_flash_profile.sh):**
    * Remove `nvidia-smi -lmc 14001,14001`.
    * Reset memory clock locking immediately:
      ```bash
@@ -366,6 +366,7 @@ To permanently resolve the DisplayPort signal dropouts:
    * *Rationale:* Provides 100% EMI immunity against chassis electromagnetic radiation when both GPUs operate at combined 1,000W+ draw.
 
 5. **Maintain Colibrì Dispatch Chunk Safeguards:**
-   * Keep `COLI_VK_CHAIN_ROWS=128`, `COLI_VK_TIER_STREAM_ROWS=2`, and `nice -n 12` active in [`scripts/start_flash_profile.sh`](file:///workspaces/colibri/scripts/start_flash_profile.sh).
+   * Keep `COLI_VK_CHAIN_ROWS=128`, `COLI_VK_TIER_STREAM_ROWS=2`, and `nice -n 12` active in [`scripts/start_flash_profile.sh`](../../../scripts/start_flash_profile.sh).
    * *Rationale:* Guarantees that background LLM compute never preempts the 4K scanout engine or game render threads.
+
 

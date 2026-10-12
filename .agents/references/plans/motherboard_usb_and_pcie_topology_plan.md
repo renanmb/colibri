@@ -1,12 +1,19 @@
 # ASUS ROG CROSSHAIR X870E Hardware Topology, Peripheral Relocation & BIOS Optimization Plan
 
 **Document Path:** `.agents/references/plans/motherboard_usb_and_pcie_topology_plan.md`  
-**Companion Optimization Plan:** [`.agents/references/plans/nvme_memory_and_vram_optimization_plan.md`](file:///workspaces/colibri/.agents/references/plans/nvme_memory_and_vram_optimization_plan.md)  
+**Companion Optimization Plan:** [`nvme_memory_and_vram_optimization_plan.md`](nvme_memory_and_vram_optimization_plan.md)  
 **Date:** October 11, 2026  
 **Motherboard Model:** ASUS ROG CROSSHAIR X870E GLACIAL / HERO (`0502` BIOS, Rev 1.xx, AMD AM5 Socket)  
 **Processor:** AMD Ryzen 9 9950X (16 Cores, 32 Threads, Granite Ridge / Raphael)  
 **Dual GPUs:** GPU 0: NVIDIA RTX PRO 6000 Blackwell 96 GB | GPU 1: NVIDIA GeForce RTX 5090 32 GB  
 **Primary Display:** Dell S3225QC (3840×2160 UHD @ 120 Hz, DSC Enabled, EDID `DEL 0xD1B9`)  
+
+> [!IMPORTANT]
+> **Devcontainer Physical Boundary Notice:**
+> The software agent operates inside a containerized Docker Devcontainer environment (`/workspaces/colibri`).
+> The physical hardware procedures detailed in this document (motherboard rear I/O re-cabling, USB port relocations, PCIe slot reseating, M.2 slot swapping, and BIOS/UEFI firmware reconfiguration) **cannot and will not work** from inside this container.
+> This document serves as a physical manual and reference guide strictly for the **human operator** working directly on the physical host workstation.
+
 
 ---
 

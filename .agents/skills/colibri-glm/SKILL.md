@@ -107,7 +107,7 @@ make -C /workspaces/colibri/c glm53 VK=1 ARCH=native
 ### 5.1 Profile A: GLM-5.3 (744B Flagship MoE)
 * **Storage Path:** `/models/glm-5.3` (141 shards, 419.3 GB)
 * **Dual-NVMe Mirror:** `/workspaces/colibri/models_mirror/glm-5.3` (141 shards, 16.16 GB/s)
-* **Launcher Script:** [`scripts/start_gaming_profile.sh`](file:///workspaces/colibri/scripts/start_gaming_profile.sh)
+* **Launcher Script:** [`scripts/start_gaming_profile.sh`](../../../scripts/start_gaming_profile.sh)
 * **Launch Command:**
   ```bash
   /workspaces/colibri/scripts/start_gaming_profile.sh
@@ -120,9 +120,9 @@ make -C /workspaces/colibri/c glm53 VK=1 ARCH=native
 
 ### 5.2 Profile B: GLM-5.3-Flash (321B Multimodal MoE)
 * **Storage Path:** `/models/glm-5.3-flash` (62 shards, 182.0 GB)
-* **Engine Binary:** [`c/glm53`](file:///workspaces/colibri/c/glm53)
+* **Engine Binary:** [`c/glm53`](../../../c/glm53)
 * **CRITICAL OOM PREVENTION KNOB:** You **must** set `GLM53_EXPERT_GB=18.0`. Without this setting, `c/glm53.c` attempts to allocate `free_now - 3.0` (79.5 GB RAM) and is immediately killed by the Linux kernel OOM killer (`systemd-oomd`).
-* **Launcher Script:** [`scripts/start_flash_profile.sh`](file:///workspaces/colibri/scripts/start_flash_profile.sh)
+* **Launcher Script:** [`scripts/start_flash_profile.sh`](../../../scripts/start_flash_profile.sh)
 * **Launch Command:**
   ```bash
   /workspaces/colibri/scripts/start_flash_profile.sh

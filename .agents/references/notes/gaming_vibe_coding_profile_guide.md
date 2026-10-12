@@ -24,7 +24,7 @@ The gaming profile establishes guaranteed hardware safety margins across all sub
 
 ## 2. Server Configuration & Production Launcher
 
-The dedicated launcher script is located at [scripts/start_gaming_profile.sh](file:///workspaces/colibri/scripts/start_gaming_profile.sh):
+The dedicated launcher script is located at [`scripts/start_gaming_profile.sh`](../../../scripts/start_gaming_profile.sh):
 
 ```bash
 #!/usr/bin/env bash
@@ -102,7 +102,7 @@ During empirical verification of `vibe-gaming -z "What is 2+2?"`:
 * **With `KV8=0` + Dual-NVMe Mirroring (Cold Prefill):** Turn 1 cold prefill completed in **21m 22s** (`real 21m22.158s`, a 54% latency reduction, streaming at 5.42 GB/s across both SSDs).
 * **With `COLI_KV_SLOTS=2` (Warm Turns):** Subsequent turns achieved **100% prefix reuse (`prefix 3759/3759, prefill 0`)**, completing in **7.797 seconds (`real 0m7.797s`)**—a **358× acceleration** over the unoptimized baseline!
 
-### 3.2 The Code Trap in [`c/glm_chain.h`](file:///workspaces/colibri/c/glm_chain.h#L720-L723)
+### 3.2 The Code Trap in [`c/glm_chain.h`](../../../c/glm_chain.h#L720-L723)
 
 Colibrì splits execution into two paths:
 1. **The MoE Expert Tier:** Executes routed Mixture-of-Experts MLPs on the dual GPUs.

@@ -282,7 +282,7 @@ To bring Hermes Agent to full operational success with GLM-5.3, the remaining wo
 - [x] Verify clean compilation with zero warnings or errors.
 
 ### Milestone 2: Update Gaming Profile Launcher Script
-- [x] Edit [scripts/start_gaming_profile.sh](file:///workspaces/colibri/scripts/start_gaming_profile.sh):
+- [x] Edit [`scripts/start_gaming_profile.sh`](../../../scripts/start_gaming_profile.sh):
   - Added `COLI_VK_TIER_STREAM_HALF=64`.
   - Configured `COLI_VK_CHAIN_ROWS=512` and `COLI_VK_TIER_STREAM_ROWS=8`.
 

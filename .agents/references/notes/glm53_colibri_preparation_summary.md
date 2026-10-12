@@ -11,7 +11,7 @@ This document consolidates all findings, architectural decisions, hardware confi
 - **Tagline:** *"Tiny engine, immense model."*
 - **Design Principles:**
   - Written in **pure C**, with zero heavy runtime dependencies (no PyTorch, no CUDA runtime bloat).
-  - One dedicated C file per model architecture family ([`c/colibri.c`](file:///workspaces/colibri/c/colibri.c) for GLM-5.2/5.3, [`c/glm53.c`](file:///workspaces/colibri/c/glm53.c) for GLM-5.3-Flash).
+  - One dedicated C file per model architecture family ([`c/colibri.c`](../../../c/colibri.c) for GLM-5.2/5.3, [`c/glm53.c`](../../../c/glm53.c) for GLM-5.3-Flash).
   - OpenMP multithreading + native vector intrinsics (AVX2, AVX-512, NEON).
   - Cross-platform GPU acceleration via **Vulkan 1.2+** and CUDA.
 
@@ -21,7 +21,7 @@ This document consolidates all findings, architectural decisions, hardware confi
 - **Placement Strategy:**
   1. **Dense weights stay resident in RAM/VRAM:** Embeddings, attention projections, shared experts, layer norms, and routers (~9.9 GB total for GLM-5.3).
   2. **Routed experts stream on-demand from NVMe SSD:** Experts are loaded dynamically based on router predictions into an adaptive LRU cache.
-  3. **GPU Expert Tiering:** Frequently activated experts are cached directly in GPU VRAM ([`c/vk_tier.c`](file:///workspaces/colibri/c/vk_tier.c)), computed on GPU while the CPU streams cold experts in parallel.
+  3. **GPU Expert Tiering:** Frequently activated experts are cached directly in GPU VRAM ([`c/vk_tier.c`](../../../c/vk_tier.c)), computed on GPU while the CPU streams cold experts in parallel.
 
 ---
 
@@ -33,12 +33,12 @@ There are two separate models in the GLM-5.3 family supported by Colibrì:
 | :--- | :--- | :--- |
 | **Total Parameters** | **744 Billion** | **321 Billion** |
 | **Architecture** | 78 layers, 256 routed experts (top-8), hidden 6144, intermediate 2048, MLA attention, DSA sparse indexer | 45 text layers + 1 MTP, 34 KDA linear attention + 11 DSA full attention layers with k-pooling, NoPE, mHC hyper-connections |
-| **Engine Executable** | [`c/colibri.c`](file:///workspaces/colibri/c/colibri.c) (binary: `colibri`, alias `glm`) | [`c/glm53.c`](file:///workspaces/colibri/c/glm53.c) (binary: `glm53`) |
+| **Engine Executable** | [`c/colibri.c`](../../../c/colibri.c) (binary: `colibri`, alias `glm`) | [`c/glm53.c`](../../../c/glm53.c) (binary: `glm53`) |
 | **Catalog ID** | `glm-5.3` (family: `glm`) | `glm53` (family: `glm53`) |
 | **Hugging Face Repo** | [`Justvugg/GLM-5.3-colibri-int4-g64`](https://huggingface.co/Justvugg/GLM-5.3-colibri-int4-g64) | [`Justvugg/GLM-5.3-Flash-colibri-int4-g64`](https://huggingface.co/Justvugg/GLM-5.3-Flash-colibri-int4-g64) |
-| **Container Path** | [`/models/glm-5.3`](file:///models/glm-5.3) | [`/models/glm-5.3-flash`](file:///models/glm-5.3-flash) |
+| **Container Path** | `/models/glm-5.3` | `/models/glm-5.3-flash` |
 | **Host Path** | `/mnt/models_fast/glm-5.3` | `/mnt/models_fast/glm-5.3-flash` |
-| **Dual-NVMe Mirror** | [`/workspaces/colibri/models_mirror/glm-5.3`](file:///workspaces/colibri/models_mirror/glm-5.3) (141/141 shards) | Stored directly on `/models/glm-5.3-flash` |
+| **Dual-NVMe Mirror** | [`models_mirror/glm-5.3`](../../../models_mirror/glm-5.3) (141/141 shards) | Stored directly on `/models/glm-5.3-flash` |
 | **Disk Size on NVMe** | **419.3 GB** (141 safetensors shards) | **182 GB** (62 safetensors shards) |
 | **Resident RAM** | ~9.9 GB (dense trunk) | ~6.9 GB (dense trunk) |
 | **Modality** | Text / Code / Complex Reasoning / Tools | **Multimodal: Vision (Images) + Text + Tools** |
