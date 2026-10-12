@@ -444,15 +444,16 @@ During live diagnostics, screen blanking (1–3 second black screens or "No Sign
 * **The Vulnerability:** At 120 Hz, each frame has an uncompromising **8.33 ms** budget. If compute kernels hold the command processor for $>20\text{ ms}$, the scanout FIFO underruns. DSC hardware cannot recover mid-frame and drops the connection. In addition, unyielded dispatches trip the Linux Xorg/Wayland TDR watchdog timer.
 * **The Solution:** Enforce `COLI_VK_CHAIN_ROWS=128`. Each forward step completes in bounded chunks ($\le 4\text{ ms}$), interleaving compute with graphics render passes without missing VBlank.
 
-##### Step 4: Relocate Gaming Peripherals from Monitor Hub to CPU-Direct USB Ports
+##### Step 4: Relocate Gaming Peripherals from Monitor Hub to Chipset 2 / USB4 (CPU PCIe)
 > [!NOTE]
 > **Host Physical Hardware Step (Not executable inside Devcontainer):**
 > Because this environment runs in a Docker Devcontainer, the agent cannot physically interact with motherboard ports or peripheral cables. This step must be performed directly by the host human operator.
-* **The Vulnerability:** Kernel logs revealed over **262 million interrupts** on IRQ 82 due to the Razer DeathAdder Elite (1000Hz polling) and Corsair keyboard plugged into the Dell S3225QC's integrated ASMedia hub, routing through the AMD Promontory 21 chipset (`0000:0f:00.0`). The resulting xHCI buffer overruns triggered `x86/split lock detection: #DB took a bus_lock trap`, freezing PCIe DMA and starving the GPU's display engine.
-* **The Solution:**
-  1. Unplug gaming mouse and keyboard from the Dell monitor's downstream USB ports.
-  2. Connect them directly to **Ports 9 and 11 (the two native AMD CPU-direct USB 3.2 Gen 2 Type-A ports located immediately below the HDMI port)** on the motherboard rear I/O shield (Controllers `0000:7c:00.3` and `0000:7c:00.4`).
-  3. *(Host Operator Action — Manual Physical Step)*: See full port layout schematic in [`motherboard_usb_and_pcie_topology_plan.md`](motherboard_usb_and_pcie_topology_plan.md).
+* **The Vulnerability:** Kernel logs revealed over **262 million interrupts** on IRQ 82 due to the Razer DeathAdder Elite (1000Hz polling) and Corsair keyboard plugged into the Dell S3225QC's integrated ASMedia hub, routing through AMD Promontory 21 Chipset 1 (`0000:0f:00.0`). The resulting xHCI buffer overruns triggered `x86/split lock detection: #DB took a bus_lock trap`, freezing PCIe DMA and starving the GPU's display engine.
+* **Motherboard Finding & Solution Options:**
+  Systematic testing confirmed that on the ASUS ROG Crosshair X870E Glacial, native AMD CPU on-die USB 3.2 controllers (`0000:7c:00.3` / `0000:7c:00.4`) are internal PCB headers only and not exposed on the rear I/O shield. Two solutions eliminate the bottleneck:
+  1. **Option A (Zero-Cost / Immediate - Current Setup):** Plug Razer mouse and Corsair keyboard into the lower red Type-A ports adjacent to the Dual 10G LAN ports (verified to bind to Chipset 2: `0000:11:00.0`). This completely decouples them from the Dell monitor hub and internal AsusTek LCD panel on Chipset 1 (`0000:0f:00.0`).
+  2. **Option B (Optimal CPU PCIe Link):** Connect mouse and keyboard via a passive USB-C to USB-A adapter/hub into either of the dual rear USB4 Type-C ports (binds to ASMedia ASM4242: `0000:79:00.0`, direct CPU PCIe 4.0 x4 link, bypassing all chipsets).
+  3. *(Host Operator Action — Manual Physical Step)*: See full ASUS ROG Crosshair X870E Glacial schematic and detailed engineering solutions in [`motherboard_usb_and_pcie_topology_plan.md`](motherboard_usb_and_pcie_topology_plan.md).
   4. Mitigate split-lock kernel handling immediately:
      ```bash
      sudo sysctl -w kernel.split_lock_mitigate=0
@@ -887,21 +888,35 @@ Use this complete step-by-step runbook when you are ready to reboot and service 
 > Phases B and C require physical computer shutdown, manual peripheral re-cabling, PCIe and M.2 hardware moves, and ASUS UEFI BIOS configuration.
 > These steps cannot be performed by the agent inside the Devcontainer and must be executed directly by the human workstation operator.
 
-1. **Relocate Gaming Peripherals to CPU-Direct Ports:**
-   * **Mouse (Razer 1000Hz):** Unplug from Dell monitor hub $\rightarrow$ Plug into **Port 9 (USB 10G Type-A)** directly below the HDMI port on the motherboard rear I/O.
-   * **Keyboard (Corsair):** Unplug from Dell monitor hub $\rightarrow$ Plug into **Port 11 (USB 10G Type-A)** adjacent to Port 9 below the HDMI port.
-   * **Dell Monitor Upstream USB Cable:** Plug into any of the lower red Type-A or Type-C ports (routes webcam/audio over Chipset without interfering with high-polling mouse packets).
+1. **Isolate Gaming Peripherals from Chipset 1 (or Route via USB4 Adapter):**
+   * **Option A (Zero-Cost / Immediate - Current Setup):** Plug Razer mouse and Corsair keyboard into the lower red Type-A ports adjacent to the Dual 10G LAN ports (verified via `python3 scripts/detect_usb_controllers.py` to bind to Chipset 2: `0000:11:00.0`, completely isolating them from the Dell monitor hub and internal AsusTek LCD panel on Chipset 1).
+   * **Option B (Optimal CPU PCIe Link):** Connect via a passive USB-C to USB-A adapter or USB-C hub plugged into either of the dual rear USB4 Type-C ports (binds to ASMedia ASM4242: `0000:79:00.0`, direct CPU PCIe 4.0 x4 link).
+   * **Dell Monitor Upstream USB Cable:** Plug into one of the middle red Type-A or Type-C ports on Chipset 1 (`0000:0f:00.0`) so the webcam and audio run on Chipset 1 without carrying mouse traffic.
 
 2. **Relocate Secondary NVMe SSD (Samsung 9100 PRO - `/models`):**
-   * Unscrew and remove NVMe 1 from slot `M.2_2` or `M.2_3`.
-   * Install NVMe 1 into slot **`M.2_4` or `M.2_5`** (or into the onboard SlimSAS port).
-   * **Keep `M.2_1` untouched:** NVMe 0 stays in `M.2_1` (CPU Gen 5 x4, 14 GB/s).
-   * *Critical Result:* Slots `M.2_2` and `M.2_3` are now completely empty, releasing all CPU graphics lanes!
+   * **Visual Guide:** See the exact physical location of all M.2 slots from the official ASUS manual:
 
-3. **Move GPU 1 (RTX 5090) to the Secondary CPU PCIe Slot:**
-   * Remove GPU 1 from the bottom `PCIEX4(G4)` chipset slot (`0000:06:00.0`).
-   * Install GPU 1 into the middle **`PCIEX16(G5)_2`** slot.
-   * Secure both GPUs with independent, dedicated 12V-2x6 power cables.
+   ![ASUS ROG Crosshair X870E Glacial M.2 Slots Physical Locations](./images/asus_glacial_m2_slots_location.png)
+
+   * **Step-by-Step Procedure:**
+     1. **Keep `M.2_1` untouched:** NVMe 0 stays in `M.2_1` (located directly above the top graphics slot, dedicated CPU Gen 5 x4 at 14 GB/s).
+     2. **Access Central M.2 Armor:** Gently pull off **Magnetic Cover 3** located beneath the top graphics card:
+
+     ![ASUS ROG Crosshair X870E Glacial Magnetic Cover 3 Revealing M.2_2 and M.2_3](./images/asus_glacial_m2_heatsink_and_slots_cover.png)
+
+     3. **Remove NVMe 1 from `M.2_2`:** Unscrew and remove NVMe 1 from slot `M.2_2` (top/left slot). **Leave `M.2_2` completely empty to release all CPU graphics lanes!**
+     4. **Install NVMe 1 into `M.2_3` (or `Q-DIMM.2`):**
+        * **Option A:** Install into `M.2_3` (bottom/right slot under the same heatsink, driven by the AMD Chipset at PCIe 4.0 x4 = ~7.5 GB/s).
+        * **Option B:** Install into the bundled **ROG Q-DIMM.2 module** (`DIMM.2_1`) inserted into the vertical slot next to the DDR5 RAM:
+
+        ![ASUS ROG Q-DIMM.2 Riser Module Installation](./images/asus_glacial_rog_q_dimm2_installation.png)
+
+   * *Critical Result:* Slot `M.2_2` is now completely empty, releasing all CPU graphics lanes for full x8/x8 bifurcation!
+
+3. **Confirm GPU Seating (NO GPU MOVES NEEDED):**
+   * GPU 0 (RTX PRO 6000) remains in Top Slot (`PCIEX16(G5)_1`).
+   * GPU 1 (RTX 5090) remains in Bottom Slot (`PCIEX16(G5)_2`).
+   * Both graphics cards are already physically installed in the only two PCIe slots on the motherboard. Secure both GPUs with independent, dedicated 12V-2x6 power cables.
 
 ---
 

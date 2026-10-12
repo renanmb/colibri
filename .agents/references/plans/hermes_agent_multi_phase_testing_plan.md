@@ -589,6 +589,6 @@ During live execution of Milestone 7 and Phase 1–5 testing, the following fund
 * **Remediation Implemented & Cross-Referenced:**
   1. *Immediate:* Disabled split-lock penalty delays (`kernel.split_lock_mitigate=0`) and locked memory clocks (`nvidia-smi -lmc 14001,14001` during compute).
   2. *Engine Launcher:* Rebalanced [`scripts/start_gaming_profile.sh`](../../../scripts/start_gaming_profile.sh) with `COLI_VK_TIER_GB=38.0`, `COLI_VK_TIER_RESERVE_GB=14.0`, `COLI_VK_CHAIN_ROWS=128`, and `COLI_VK_EXPERTS2=1800` (~50/50 compute split across GPUs).
-  3. *Physical Migration Runbook (Host Operator Manual Actions — Not Executable Inside Devcontainer):* Fully detailed in [`motherboard_usb_and_pcie_topology_plan.md`](motherboard_usb_and_pcie_topology_plan.md) and Section 8 of [`nvme_memory_and_vram_optimization_plan.md`](nvme_memory_and_vram_optimization_plan.md) (relocating peripherals to Ports 9 & 11, moving NVMe 1 to `M.2_4`/`M.2_5`, and seating GPU 1 in `PCIEX16(G5)_2` with `[x8/x8 Mode]` bifurcation).
+  3. *Physical Migration Runbook (Host Operator Manual Actions — Not Executable Inside Devcontainer):* Fully detailed in [`motherboard_usb_and_pcie_topology_plan.md`](motherboard_usb_and_pcie_topology_plan.md) and Section 8 of [`nvme_memory_and_vram_optimization_plan.md`](nvme_memory_and_vram_optimization_plan.md) (relocating mouse and keyboard to CPU-direct ports via `scripts/detect_usb_controllers.py --watch`, moving NVMe 1 to `M.2_4`/`M.2_5`, and seating GPU 1 in `PCIEX16(G5)_2` with `[x8/x8 Mode]` bifurcation).
 
 

@@ -22,9 +22,9 @@ cd "${REPO_ROOT}"
 echo "[Gaming Profile] Stopping any running server..."
 python3 c/coli stop 2>/dev/null || true
 
-echo "[Gaming Profile] Locking GPU clocks & setting persistence mode..."
+echo "[Gaming Profile] Locking graphics core clocks & resetting memory clocks..."
 nvidia-smi -pm 1 >/dev/null 2>&1 || true
-nvidia-smi -lmc 14001,14001 >/dev/null 2>&1 || true
+nvidia-smi -rmc >/dev/null 2>&1 || true
 nvidia-smi -lgc 2100,2850 >/dev/null 2>&1 || true
 
 echo "[Gaming Profile] Launching tuned Colibrì background server..."

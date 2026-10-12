@@ -1,19 +1,23 @@
-# ASUS ROG CROSSHAIR X870E Hardware Topology, Peripheral Relocation & BIOS Optimization Plan
+# ASUS ROG CROSSHAIR X870E GLACIAL Hardware Topology, Peripheral Relocation & BIOS Optimization Plan
 
 **Document Path:** `.agents/references/plans/motherboard_usb_and_pcie_topology_plan.md`  
 **Companion Optimization Plan:** [`nvme_memory_and_vram_optimization_plan.md`](nvme_memory_and_vram_optimization_plan.md)  
-**Date:** October 11, 2026  
-**Motherboard Model:** ASUS ROG CROSSHAIR X870E GLACIAL / HERO (`0502` BIOS, Rev 1.xx, AMD AM5 Socket)  
+**Date:** October 12, 2026  
+**Verified Motherboard Model:** ASUSTeK COMPUTER INC. `ROG CROSSHAIR X870E GLACIAL` (BIOS `0502`, Rev 1.xx, AMD AM5 Socket)  
 **Processor:** AMD Ryzen 9 9950X (16 Cores, 32 Threads, Granite Ridge / Raphael)  
 **Dual GPUs:** GPU 0: NVIDIA RTX PRO 6000 Blackwell 96 GB | GPU 1: NVIDIA GeForce RTX 5090 32 GB  
 **Primary Display:** Dell S3225QC (3840×2160 UHD @ 120 Hz, DSC Enabled, EDID `DEL 0xD1B9`)  
+
+### Official Motherboard Documentation & Manual Links
+* **Official Product Page:** [ASUS ROG Crosshair X870E Glacial (Global)](https://rog.asus.com/motherboards/rog-crosshair/rog-crosshair-x870e-glacial/)
+* **Support & PDF Manual Download:** [ASUS ROG Crosshair X870E Glacial Helpdesk Manual](https://rog.asus.com/motherboards/rog-crosshair/rog-crosshair-x870e-glacial/helpdesk_manual/)  
+  *(Download the User's Manual PDF: refer to Chapter 1 "Motherboard Layout" and "Rear I/O Connection" for physical connector maps).*
 
 > [!IMPORTANT]
 > **Devcontainer Physical Boundary Notice:**
 > The software agent operates inside a containerized Docker Devcontainer environment (`/workspaces/colibri`).
 > The physical hardware procedures detailed in this document (motherboard rear I/O re-cabling, USB port relocations, PCIe slot reseating, M.2 slot swapping, and BIOS/UEFI firmware reconfiguration) **cannot and will not work** from inside this container.
 > This document serves as a physical manual and reference guide strictly for the **human operator** working directly on the physical host workstation.
-
 
 ---
 
@@ -50,69 +54,120 @@ During live multi-turn benchmarking and autonomous coding with GLM-5.3, deep tel
 
 ---
 
-## 2. ASUS ROG Crosshair X870E USB Controller & Rear I/O Mapping
+## 2. ASUS ROG Crosshair X870E Glacial USB Controller & Rear I/O Mapping
 
 ### 2.1 Sysfs Controller-to-PCI Architecture Map
 
 The system scan confirmed the presence of three distinct USB controller domains:
 
-| Controller Domain | PCI Address | Vendor / Device ID | Linux Root Hubs | Physical Characteristics | Current State |
+| Controller Domain | PCI Address | Vendor / Device ID | Linux Root Hubs | Physical Routing & Characteristics | Current State |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **AMD CPU On-Die USB 3.2** | `0000:7c:00.3` | `1022:15b6` | `usb3` (480M), `usb4` (10G) | Direct CPU PCIe lanes, lowest latency, zero chipset contention | **EMPTY (0 devices)** |
-| **AMD CPU On-Die USB 3.2** | `0000:7c:00.4` | `1022:15b7` | `usb5` (480M), `usb6` (10G) | Direct CPU PCIe lanes, dedicated hardware transfer rings | **EMPTY (0 devices)** |
-| **AMD CPU On-Die USB 2.0** | `0000:7d:00.0` | `1022:15b8` | `usb7` (480M) | Direct CPU legacy line | **EMPTY (0 devices)** |
-| **ASMedia USB4 Controller**| `0000:79:00.0` | `1b21:2426` (ASM4242) | `usb1` (480M), `usb2` (20G) | Dual 40Gbps Type-C ports, Thunderbolt 4 compliant | **EMPTY (0 devices)** |
-| **AMD Promontory 21 #1**   | `0000:0f:00.0` | `1022:43fd` (Chipset 1)| `usb8` (480M), `usb9` (20G) | Shares DMI/PCIe downlink with SATA and M.2 storage | **OVERRUN (262M IRQs)** |
-| **AMD Promontory 21 #2**   | `0000:11:00.0` | `1022:43fd` (Chipset 2)| `usb10` (480M), `usb11` (20G)| Secondary chipset daisy-chain | **Active (Audio device)**|
+| **AMD CPU On-Die USB 3.2** | `0000:7c:00.3` | `1022:15b6` | `usb3` (480M), `usb4` (10G) | **Internal PCB Header Only** (Front panel USB-C header, not rear I/O) | **EMPTY (0 devices)** |
+| **AMD CPU On-Die USB 3.2** | `0000:7c:00.4` | `1022:15b7` | `usb5` (480M), `usb6` (10G) | **Internal PCB Header Only** (Front panel 19-pin header, not rear I/O) | **EMPTY (0 devices)** |
+| **AMD CPU On-Die USB 2.0** | `0000:7d:00.0` | `1022:15b8` | `usb7` (480M) | Internal PCB legacy line | **EMPTY (0 devices)** |
+| **ASMedia USB4 Controller**| `0000:79:00.0` | `1b21:2426` (ASM4242) | `usb1` (480M), `usb2` (20G) | **Direct CPU PCIe 4.0 x4 Link**; Dual 40Gbps Type-C rear ports (DisplayPort Alt-Mode) | **EMPTY (0 devices)** |
+| **AMD Promontory 21 #1**   | `0000:0f:00.0` | `1022:43fd` (Chipset 1)| `usb8` (480M), `usb9` (20G) | Rear Type-A & Type-C (Middle cluster); shares DMI with SATA, M.2, 5" LCD | **OVERRUN (262M IRQs)** |
+| **AMD Promontory 21 #2**   | `0000:11:00.0` | `1022:43fd` (Chipset 2)| `usb10` (480M), `usb11` (20G)| Rear Type-A & Type-C (Lower cluster near 10G LAN); daisy-chained PCH | **Active (Audio/Peripherals)**|
 
 ---
 
-### 2.2 Physical Rear I/O Panel Port Guide (Where to Plug Each Device)
+### 2.2 Hardware Test Finding: Rear Panel Routing vs. Internal Headers
 
-Looking at the rear I/O shield of the ASUS ROG Crosshair X870E (oriented vertically or horizontally):
+> [!WARNING]
+> **Empirical Hardware Finding: Rear Type-A Ports Do NOT Route Directly to CPU (`0000:7c:00.3/4`)**
+> Systematic physical testing of all available rear I/O ports using [`scripts/detect_usb_controllers.py`](../../scripts/detect_usb_controllers.py) revealed a critical motherboard routing characteristic:
+> 1. **Every rear Type-A port on the ROG Crosshair X870E Glacial routes through the AMD Promontory 21 Chipsets** (either Chipset 1 `0000:0f:00.0` or Chipset 2 `0000:11:00.0`).
+> 2. The native AMD Ryzen 9 9950X on-die USB 3.2 controllers (`0000:7c:00.3` and `0000:7c:00.4`) are **routed strictly to the motherboard's internal front-panel headers** (`U32G2X2_1` front USB-C and 19-pin header) and are **not exposed on the rear I/O shield**.
+> 3. The **only rear-panel ports directly connected to the CPU over dedicated PCIe lanes** are the **dual USB4 40Gbps Type-C ports**, driven by the ASMedia ASM4242 controller (`0000:79:00.0` over dedicated CPU PCIe 4.0 x4).
+
+---
+
+### 2.3 Physical Rear I/O Panel Port Architecture & Alternative Solutions
+
+Below is the official ASUS ROG Crosshair X870E Glacial rear panel diagram from the user manual:
+
+![ASUS ROG Crosshair X870E Glacial Rear I/O Panel Connectors](./images/asus_glacial_rear_io_panel.png)
+
+Looking at the rear I/O shield of the **ASUS ROG Crosshair X870E Glacial**:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                    ASUS ROG CROSSHAIR X870E REAR I/O PANEL SCHEMATIC                   │
+│               ASUS ROG CROSSHAIR X870E GLACIAL REAR I/O PANEL SCHEMATIC                │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                        │
-│  [Clear CMOS]   [BIOS FlashBack]                                                       │
+│  [Clear CMOS]   [BIOS FlashBack™]                                                      │
 │                                                                                        │
-│  [ HDMI 2.1 ]   [Port 9: USB 10G Type-A]  <─── CPU-DIRECT (7c:00.3) ──★ PLUG MOUSE    │
-│                 [Port 11: USB 10G Type-A] <─── CPU-DIRECT (7c:00.4) ──★ PLUG KEYBOARD │
+│  [ Wi-Fi 7 Q-Antenna Connectors ]                                                      │
 │                                                                                        │
-│  [USB4 40G Type-C (Top)]    (ASMedia ASM4242 Controller)                               │
-│  [USB4 40G Type-C (Bottom)] (ASMedia ASM4242 Controller)                               │
+│  [USB4 40G Type-C #1 (Top)]    (ASMedia ASM4242 - Direct CPU PCIe 4.0 x4)              │
+│  [USB4 40G Type-C #2 (Bottom)] (ASMedia ASM4242 - Direct CPU PCIe 4.0 x4)              │
+│       ▲                                                                                │
+│       └─── ★ SOLUTION 1 (RECOMMENDED): USE USB-C TO USB-A ADAPTER HERE                 │
 │                                                                                        │
-│  [Realtek 5G LAN]  [USB 10G Type-A (Red)] (Chipset 1) ──★ PLUG MONITOR UPSTREAM CABLE │
-│                    [USB 10G Type-A (Red)] (Chipset 1)                                  │
+│  [USB 10G Type-A (Red)] (Chipset 1: 0000:0f:00.0) ──★ MONITOR UPSTREAM USB CABLE       │
+│  [USB 10G Type-A (Red)] (Chipset 1: 0000:0f:00.0)                                      │
+│  [USB 10G Type-C]       (Chipset 1: 0000:0f:00.0)                                      │
+│  [USB 10G Type-C]       (Chipset 1: 0000:0f:00.0)                                      │
 │                                                                                        │
-│  [Intel 2.5G LAN]  [USB 10G Type-A (Red)] (Chipset 2)                                  │
-│                    [USB 10G Type-A (Red)] (Chipset 2)                                  │
+│  [Realtek 10G LAN #1]   [USB 10G Type-A (Red)] (Chipset 2: 0000:11:00.0)               │
+│                         [USB 10G Type-A (Red)] (Chipset 2: 0000:11:00.0)               │
+│                              ▲                                                         │
+│                              └─── ★ SOLUTION 3: CURRENT LOCATION (ISOLATED ON CHIPSET 2)│
+│  [Realtek 10G LAN #2]   [USB 10G Type-C]       (Chipset 2: 0000:11:00.0)               │
+│                         [USB 10G Type-C]       (Chipset 2: 0000:11:00.0)               │
 │                                                                                        │
-│  [USB 10G Type-C] (Chipset 1)                                                          │
-│  [USB 10G Type-C] (Chipset 2)                                                          │
-│                                                                                        │
-│  [Wi-Fi 7 Q-Antenna Connectors]                                                        │
-│                                                                                        │
-│  [Optical S/PDIF Out]   [Line Out (Gold)]   [Mic In (Gold)]                            │
+│  [Optical S/PDIF Out]   [Line Out (Gold)]      [Mic In (Gold)]                         │
 │                                                                                        │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Exact Peripheral Re-Cabling Table:
+---
 
-| Peripheral | Current (Problematic) Location | Recommended Target Port | Controller Domain | Rationale |
-| :--- | :--- | :--- | :--- | :--- |
-| **Razer DeathAdder Elite** (1000Hz Mouse) | Dell Monitor Downstream Hub | **Port 9 (USB 10G Type-A)** | **CPU-Direct (`0000:7c:00.3`)** | Bypasses chipset. Dedicated DMA ring eliminates 262M interrupt storm and `#DB bus_lock` freezes. |
-| **Corsair STRAFE RGB** (Gaming Keyboard) | Dell Monitor Downstream Hub | **Port 11 (USB 10G Type-A)** | **CPU-Direct (`0000:7c:00.4`)** | Lowest input latency. Decoupled from video/audio polling traffic. |
-| **NexiGo N930P FHD** (Webcam) | Dell Monitor Downstream Hub | **Dell Monitor Hub OR Rear Type-A** | Chipset 1 (`0000:0f:00.0`) | Video stream no longer collides with 1000Hz gaming mouse interrupts. |
-| **Dell S3225QC Monitor Upstream USB Cable** | Motherboard Port (Chipset 1) | **Rear USB 10G Type-A / Type-C** | Chipset 1 / 2 | Drives the monitor's internal hub for audio/webcam without carrying mouse traffic. |
-| **Dell S3225QC DisplayPort Cable** | GPU 0 (`card0-DP-3`) | **GPU 0 DisplayPort 1 (Top GPU)** | RTX PRO 6000 Blackwell | Must connect directly to GPU 0 using a VESA DP80 certified shielded cable ($\le 1.8\text{m}$). |
+### 2.4 Alternative Solutions Evaluated & Action Plan
+
+Since the native CPU USB 3.2 controllers are not wired to rear Type-A ports, we evaluate four viable engineering solutions to prevent the 262M IRQ storm and `#DB split_lock` bus stalls:
+
+#### Solution 1: Direct CPU PCIe Link via Rear USB4 Type-C Adapter (Recommended Hardware Solution)
+* **Mechanism:** Plug a passive **USB-C male to USB-A female adapter** (or small USB-C hub) into one of the dual rear **USB4 (40Gbps) Type-C ports**. Connect the Razer DeathAdder Elite mouse and Corsair keyboard to this adapter.
+* **Controller Domain:** ASMedia ASM4242 (`0000:79:00.0`).
+* **Hardware Architecture:** Connected **directly to CPU PCIe 4.0 x4 lanes**, completely bypassing both Promontory 21 daisy-chained chipsets.
+* **Why It Works:** Eliminates all chipset contention with SATA, secondary M.2 drives, and the onboard 5-inch LCD panel. Controller `0000:79:00.0` currently has **0 IRQs** and provides clean, dedicated hardware DMA rings.
+
+#### Solution 2: Chassis Front-Panel USB Ports (Native On-Die CPU Routing)
+* **Mechanism:** If the PC case front-panel USB ports are connected to the motherboard internal headers (`U32G2X2_1` front Type-C header or 19-pin header), plug the mouse and keyboard into the **chassis front-panel USB ports**.
+* **Controller Domain:** AMD CPU On-Die USB 3.2 Gen 2 (`0000:7c:00.3` / `0000:7c:00.4`).
+* **Why It Works:** Directly accesses the on-die Ryzen 9 9950X USB controllers.
+
+#### Solution 3: Dedicated Isolation on Chipset 2 (Immediate / Zero-Hardware Solution - CURRENT STATE)
+* **Mechanism:** Keep the Razer mouse on Port `10-2` and Corsair keyboard on Port `10-3` on **Chipset 2 (`0000:11:00.0`)** (the red Type-A ports adjacent to the Dual 10G Realtek LAN ports). Ensure the Dell S3225QC monitor upstream USB cable is plugged into **Chipset 1 (`0000:0f:00.0`)**.
+* **Controller Domain:** AMD Promontory 21 Chipset 2 (`0000:11:00.0`).
+* **Why It Works:** Separates the 1000Hz gaming mouse from the Dell monitor's ASMT2307 USB 2.0 transaction translator and the internal AsusTek LCD panel on Chipset 1. Even though it still traverses the secondary chipset PCIe downlink, traffic collision is drastically reduced.
+
+#### Solution 4: Mouse Polling Rate Optimization (Software Solution)
+* **Mechanism:** Reduce the Razer DeathAdder Elite polling rate from **1000Hz (1 ms)** to **500Hz (2 ms)** or 250Hz via Razer Synapse (saved to onboard memory) or Linux utility (`libratbag` / `ratbagctl`).
+* **Why It Works:** Cuts interrupt frequency from 1,000 interrupts/sec to 500 interrupts/sec (50% reduction in PCIe interrupt traffic), significantly mitigating transaction translator buffer overruns on chipset USB controllers.
+
+---
+
+#### Peripheral Allocation Table (Revised):
+
+| Peripheral | Previous (Overloaded) Port | Solution 1 (Optimal CPU PCIe) | Solution 3 (Current Zero-Cost) | Target Controller | Architecture Benefit |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Razer DeathAdder Elite** (1000Hz Mouse) | Dell Monitor Downstream Hub | **Rear USB4 Type-C** (via USB-C to USB-A adapter) | **Rear Lower Red Type-A** (`10-2`) | ASMedia ASM4242 (`0000:79:00.0`) OR Chipset 2 (`0000:11:00.0`) | Bypasses Chipset 1 completely; stops 262M IRQ storm. |
+| **Corsair STRAFE RGB** (Gaming Keyboard) | Dell Monitor Downstream Hub | **Rear USB4 Type-C** (via adapter/hub) | **Rear Lower Red Type-A** (`10-3`) | ASMedia ASM4242 (`0000:79:00.0`) OR Chipset 2 (`0000:11:00.0`) | Stable low-latency input without video/audio interference. |
+| **NexiGo N930P FHD** (Webcam) | Dell Monitor Downstream Hub | **Dell Monitor Hub OR Middle Red Type-A** | **Dell Monitor Hub** | Chipset 1 (`0000:0f:00.0`) | Video stream no longer collides with 1000Hz mouse traffic. |
+| **Dell S3225QC Monitor Upstream USB Cable** | Motherboard Port (Chipset 1) | **Middle Red Type-A / Type-C** | **Middle Red Type-A / Type-C** | Chipset 1 (`0000:0f:00.0`) | Drives monitor hub for webcam/audio without carrying mouse traffic. |
+| **Dell S3225QC DisplayPort Cable** | GPU 0 (`card0-DP-3`) | **GPU 0 DisplayPort 1 (Top GPU)** | **GPU 0 DisplayPort 1 (Top GPU)** | RTX PRO 6000 Blackwell | Direct DP80 certified shielded cable ($\le 1.8\text{m}$). |
 
 ---
 
 ## 3. Motherboard PCIe Slot & M.2 Storage Lane Topology
+
+Below is the official ASUS ROG Crosshair X870E Glacial motherboard schematic from the user manual:
+
+![ASUS ROG Crosshair X870E Glacial Motherboard Layout Overview](./images/asus_glacial_motherboard_layout.png)
+
+---
 
 ### 3.1 AMD AM5 Lane Allocation & The Bifurcation Challenge
 
@@ -122,31 +177,94 @@ The AMD Ryzen 9 9950X provides **28 total PCIe Gen 5 lanes**:
 * **4 lanes:** Downlink to AMD Promontory 21 dual-chipsets.
 * **4 lanes:** General-purpose / USB on-die controllers.
 
-### 3.2 ASUS ROG Crosshair X870E Manual Bifurcation & Lane Sharing Matrix
+Below is the official ASUS diagram illustrating how connectors share bandwidth on the Glacial:
 
-According to the official **ASUS ROG Crosshair X870E User Manual** (Expansion Slots & PCIe Bifurcation Table):
+![ASUS ROG Crosshair X870E Glacial Shared Bandwidth Architecture Map](./images/asus_glacial_shared_bandwidth_map.png)
 
-| M.2 Slot Configuration | Primary Slot (`PCIEX16(G5)_1`) | Secondary Slot (`PCIEX16(G5)_2`) | Chipset Slot (`PCIEX4(G4)`) | Notes / Lane Allocation |
+---
+
+### 3.2 ASUS ROG Crosshair X870E Glacial Expansion Slot Architecture & Lane Sharing Matrix
+
+The **ROG Crosshair X870E Glacial** has **EXACTLY TWO physical PCIe expansion slots** (there is NO third or "middle" slot):
+* **Slot 1 (Top):** `PCIEX16(G5)_1` — Populated by **GPU 0 (RTX PRO 6000 Blackwell)** at `0000:01:00.0`.
+* **Slot 2 (Bottom):** `PCIEX16(G5)_2` — Populated by **GPU 1 (RTX 5090 Blackwell)** at `0000:06:00.0`.
+
+![ASUS ROG Crosshair X870E Glacial PCIe Expansion Slots](./images/asus_glacial_pcie_expansion_slots.png)
+
+> [!IMPORTANT]
+> **GPU 1 is ALREADY Installed in the Correct Physical Slot!**
+> You do **not** need to physically move GPU 1 to another slot. Both graphics cards are already physically seated in the only two PCIe slots on the motherboard.
+
+#### Why GPU 1 is Throttled to PCIe 3.0 x4 (~3.9 GB/s) Right Now:
+Live system scanning confirms the exact bottleneck:
+* **GPU 0 (`0000:01:00.0`):** `32.0 GT/s PCIe x16` (Gen 5 x16) direct from the CPU (`0000:00:01.1`).
+* **GPU 1 (`0000:06:00.0`):** `2.5 / 8.0 GT/s PCIe x4` (Gen 3 x4) routed through Promontory 21 Chipset 1 (`0000:03:00.0` $\rightarrow$ `0000:04:04.0`).
+* **NVMe 0 (`0000:02:00.0`):** `32.0 GT/s PCIe x4` in `M.2_1` (Optimal Gen 5 x4, 14 GB/s).
+* **NVMe 1 (`0000:7b:00.0`):** `32.0 GT/s PCIe x2` in `M.2_2` (Compromised Gen 5 x2, 7 GB/s).
+
+According to the official **ASUS ROG Crosshair X870E Glacial User Manual**:
+1. **The Default BIOS Behavior:** By default, when `PCIEX16(G5)_1` operates at full PCIe 5.0 x16, ASUS defaults `PCIEX16(G5)_2` to **PCIe 3.0 x4 routing through the chipset** unless manually bifurcated in BIOS.
+2. **The `M.2_2` Lane Stealing Trap:** On the Glacial, slot `M.2_2` derives its PCIe lanes directly from the CPU's primary graphics lanes. Populating `M.2_2` with an SSD breaks the clean CPU x8/x8 bifurcation and drops links to degraded states!
+
+#### Glacial M.2 Storage & PCIe Lane Allocation Matrix:
+
+| Storage Configuration | `PCIEX16(G5)_1` (GPU 0) | `PCIEX16(G5)_2` (GPU 1) | M.2 Slots Status | Resulting Multi-GPU Performance |
 | :--- | :--- | :--- | :--- | :--- |
-| **M.2_2 & M.2_3 Empty** | **Gen 5 x16** (or x8 if slot 2 used) | **Gen 5 x8** | Gen 4 x4 (Chipset) | **Target High-Performance Multi-GPU State** |
-| **M.2_3 Populated** | **Gen 5 x8** | **Gen 5 x4** | Gen 4 x4 (Chipset) | Secondary GPU dropped to x4 |
-| **M.2_2 & M.2_3 Populated** | **Gen 5 x8** | **DISABLED (0 lanes)** | Gen 4 x4 (Chipset) | **Current Trap: PCIEX16_2 completely shut off!** |
-| **M.2_4 & M.2_5 Populated** | **Gen 5 x16** (or x8/x8) | **Gen 5 x8** | Gen 4 x4 (Chipset) | Connected via Chipset; **Zero impact on CPU lanes** |
-| **SlimSAS Populated** | **Gen 5 x16** (or x8/x8) | **Gen 5 x8** | Gen 4 x4 (Chipset) | Chipset managed; **Zero impact on CPU lanes** |
+| **Current State: NVMe 1 in `M.2_2`** | **PCIe 5.0 x16** | **PCIe 3.0 x4 (via Chipset)** | `M.2_1` Gen 5 x4, `M.2_2` Gen 5 x2 | GPU 1 throttled to ~3.9 GB/s (Choked on chipset bus) |
+| **Optimal State: `M.2_2` EMPTY, NVMe 1 in `M.2_3` or `Q-DIMM.2`** | **PCIe 5.0 x8 (32 GT/s)** | **PCIe 5.0 x8 (32 GT/s)** | `M.2_1` Gen 5 x4, `M.2_3` Gen 4 x4 | **Unlocks 32 GB/s bidirectional on BOTH GPUs!** |
 
-#### Why GPU 1 (RTX 5090) is Degraded to PCIe 3.0 x4:
-1. **The Bifurcation Trap:** Because NVMe 1 was installed in `M.2_2` or `M.2_3`, the ASUS motherboard BIOS automatically **disabled or downgraded the secondary CPU expansion slot (`PCIEX16(G5)_2`)** to preserve lane stability.
-2. **Forced Chipset Routing:** To get GPU 1 recognized, it was plugged into the bottom `PCIEX4` slot (`0000:06:00.0`), which hangs off the Promontory 21 chipset uplink.
-3. **Chipset Traffic Collisions:** The chipset link is only a 4-lane Gen 4 interconnect that simultaneously carries GPU 1 tensor traffic, NVMe 1 reads, 5G LAN, SATA, and all USB controller traffic (which was logging 262M interrupts)! This throttled the RTX 5090 down to PCIe 3.0 x4 (~3.9 GB/s).
+---
 
-#### Optimal Hardware Remediation:
-1. **Move NVMe 1 to `M.2_4` or `M.2_5` (or onboard SlimSAS):**
-   * `M.2_1` (CPU Gen 5 x4) $\rightarrow$ NVMe 0 (`/workspaces/colibri`, primary OS & mirror). Full 14 GB/s speed.
-   * `M.2_4` or `M.2_5` (Chipset Gen 4 x4) $\rightarrow$ NVMe 1 (`/models`). Provides 7.5 GB/s without consuming any CPU graphics lanes!
-   * Leaves `M.2_2` and `M.2_3` completely **EMPTY**.
-2. **Move GPU 1 (RTX 5090) to `PCIEX16(G5)_2` (Middle x16 Slot):**
-   * With `M.2_2` and `M.2_3` unpopulated, the motherboard cleanly bifurcates `PCIEX16(G5)_1` and `PCIEX16(G5)_2` into **dedicated Gen 5 x8 / x8** (16 GB/s bidirectional each).
-   * GPU 1 gains direct CPU DMA access with zero chipset hops, quadrupling its transfer bandwidth!
+### 3.3 Visual Guide: Locating and Accessing the M.2 Storage Slots
+
+Below is the official ASUS diagram showing the physical positions of the M.2 sockets on the motherboard PCB:
+
+![ASUS ROG Crosshair X870E Glacial M.2 Slots Physical Locations](./images/asus_glacial_m2_slots_location.png)
+
+1. **`M.2_1(SOCKET3)` (Top Slot — CPU Gen 5 x4):**
+   * Located directly above the top graphics card (`PCIEX16(G5)_1`), right under the CPU socket.
+   * Dedicated CPU PCIe 5.0 x4 connection (14 GB/s).
+   * **Keep NVMe 0 (`/workspaces/colibri`) here! Do not touch.**
+
+2. **`M.2_2(SOCKET3)` & `M.2_3(SOCKET3)` (Central Armor Section):**
+   * Located directly beneath the top graphics card (`PCIEX16(G5)_1`), covered by **Magnetic Cover 3**:
+
+![ASUS ROG Crosshair X870E Glacial Magnetic Cover 3 Revealing M.2_2 and M.2_3](./images/asus_glacial_m2_heatsink_and_slots_cover.png)
+
+   * **Step-by-Step Access:**
+     1. Gently pull off **Magnetic Cover 3** (it is held by magnets).
+     2. Press the M.2 Q-Release latch to remove the aluminum heatsink cover.
+     3. You will see two M.2 slots side by side:
+        * **`M.2_2` (Top/Left):** **Unscrew and remove NVMe 1 from here! Leave it completely EMPTY.**
+        * **`M.2_3` (Bottom/Right):** Connected to the AMD X870E Chipset (PCIe 4.0 x4). **Install NVMe 1 here!**
+     4. Click the heatsink cover and magnetic cover back into place.
+
+---
+
+### 3.4 Alternative Storage Location: The ROG Q-DIMM.2 Expansion Module
+
+If you do not want to remove the central magnetic cover, the Glacial includes a vertical expansion slot directly to the right of the DDR5 memory slots:
+
+![ASUS ROG Q-DIMM.2 Riser Module Installation](./images/asus_glacial_rog_q_dimm2_installation.png)
+
+* The bundled **ROG Q-DIMM.2 card** installs like a stick of RAM and accommodates two M.2 SSDs (`DIMM.2_1` and `DIMM.2_2`) running on Chipset PCIe 4.0 x4 lanes.
+* Installing NVMe 1 into `DIMM.2_1` leaves the central motherboard armor untouched while keeping CPU graphics lanes completely clear!
+
+---
+
+### 3.5 Actionable Remediation Summary
+
+1. **Keep GPU 0 and GPU 1 Exactly Where They Are:** Both GPUs remain in Slot 1 (`PCIEX16(G5)_1`) and Slot 2 (`PCIEX16(G5)_2`).
+2. **Relocate NVMe 1 to a Chipset Slot:**
+   * **Keep NVMe 0 in `M.2_1`:** Primary OS and repository stay at blistering PCIe 5.0 x4 (14 GB/s line rate).
+   * **Remove NVMe 1 from `M.2_2`:** Leave `M.2_2` **completely empty** to release CPU graphics lanes!
+   * **Install NVMe 1 into either `M.2_3` onboard slot or `ROG Q-DIMM.2` module.**
+3. **Set BIOS Bifurcation to `[x8/x8 Mode]`:**
+   * Enter ASUS UEFI BIOS (`Del` or `F2`).
+   * Navigate to: `Advanced -> Onboard Devices Configuration` (or `PCIe Configuration`).
+   * Set `PCIEX16_1 + PCIEX16_2 Bandwidth Bifurcation` $\rightarrow$ **`[x8/x8 Mode]`**.
+   * Set both slot link speeds to **`[GEN 5]`**.
+   * Press `F10` to save and reboot.
 
 ---
 
@@ -308,18 +426,20 @@ for d in ['0000:01:00.0', '0000:02:00.0', '0000:03:00.0', '0000:06:00.0']:
 ## 6. Actionable Maintenance Checklist for Next Reboot
 
 1. [ ] **Shutdown Workstation:** Power off completely.
-2. [ ] **Move Mouse & Keyboard to CPU-Direct Ports:**
-   * Unplug Razer DeathAdder and Corsair keyboard from the Dell monitor hub.
-   * Plug both into the two USB Type-A ports immediately below the HDMI port on the motherboard (Ports 9 & 11).
-3. [ ] **Relocate NVMe 1 to Chipset Slot (`M.2_4` or `M.2_5`):**
-   * Remove secondary Samsung 9100 PRO SSD from slot `M.2_2` / `M.2_3`.
-   * Install into slot `M.2_4` or `M.2_5` (or SlimSAS).
-   * Leave `M.2_2` and `M.2_3` completely empty to release CPU graphics lanes!
-4. [ ] **Move GPU 1 (RTX 5090) to Secondary CPU Slot:**
-   * Remove GPU 1 from the bottom `PCIEX4(G4)` chipset slot.
-   * Install GPU 1 into the middle `PCIEX16(G5)_2` slot.
+2. [ ] **Isolate Gaming Peripherals from Chipset 1 (or Route via USB4 Adapter):**
+   * **Option A (Zero-Cost / Immediate - Current Setup):** Plug Razer DeathAdder and Corsair keyboard into the lower red USB Type-A ports adjacent to the Dual 10G LAN ports (verified to bind to Chipset 2: `0000:11:00.0`, completely isolating them from the Dell monitor hub and internal LCD panel on Chipset 1).
+   * **Option B (Optimal CPU PCIe DMA):** Plug into either rear USB4 Type-C port using a passive USB-C to USB-A adapter or USB-C hub (verified to bind to ASMedia ASM4242: `0000:79:00.0`, direct CPU PCIe 4.0 x4 link).
+   * Verify interactively via `python3 scripts/detect_usb_controllers.py --watch`.
+3. [ ] **Relocate NVMe 1 to Chipset Slot (`M.2_3` or `ROG Q-DIMM.2`):**
+   * Remove secondary Samsung 9100 PRO SSD from slot `M.2_2`.
+   * Install into slot `M.2_3` (onboard chipset slot) or the bundled `ROG Q-DIMM.2` riser module (`DIMM.2_1`).
+   * Leave `M.2_2` completely empty to release CPU graphics lanes!
+4. [ ] **Confirm GPU Seating (NO GPU MOVES NEEDED):**
+   * GPU 0 (RTX PRO 6000) remains in Top Slot (`PCIEX16(G5)_1`).
+   * GPU 1 (RTX 5090) remains in Bottom Slot (`PCIEX16(G5)_2`).
+   * Both GPUs are already physically seated in the correct slots!
 5. [ ] **Connect Monitor Upstream Cable:**
-   * Plug the Dell monitor upstream cable into one of the lower red Type-A or Type-C ports.
+   * Plug the Dell monitor upstream cable into one of the middle red Type-A or Type-C ports on Chipset 1 (`0000:0f:00.0`).
 6. [ ] **Enter ASUS BIOS (`Del` or `F2` on boot):**
    * `Advanced -> Onboard Devices Configuration`:
      * `PCIEX16_1 + PCIEX16_2 Bandwidth Bifurcation` $\rightarrow$ Set to **`[x8/x8 Mode]`**.
@@ -332,6 +452,6 @@ for d in ['0000:01:00.0', '0000:02:00.0', '0000:03:00.0', '0000:06:00.0']:
    * Press `F10` to save changes and reboot.
 7. [ ] **Verify in Linux:**
    * Run `sysctl kernel.split_lock_mitigate` (must return `0`).
-   * Run the USB verification script (Section 5.3) $\rightarrow$ mouse & keyboard show on CPU-DIRECT.
+   * Run the USB verification script (Section 5.3) $\rightarrow$ mouse & keyboard show on ASM4242 USB4 (`0000:79:00.0`) or Chipset 2 (`0000:11:00.0`), eliminating the IRQ 82 storm on Chipset 1.
    * Run the PCIe verification script (Section 5.4) $\rightarrow$ both GPUs show PCIe 5.0 (32 GT/s).
    * Confirm IRQ 82 interrupt count stops escalating.
