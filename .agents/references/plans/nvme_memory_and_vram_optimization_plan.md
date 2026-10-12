@@ -894,22 +894,28 @@ Use this complete step-by-step runbook when you are ready to reboot and service 
    * **Dell Monitor Upstream USB Cable:** Plug into one of the middle red Type-A or Type-C ports on Chipset 1 (`0000:0f:00.0`) so the webcam and audio run on Chipset 1 without carrying mouse traffic.
 
 2. **Relocate Secondary NVMe SSD (Samsung 9100 PRO - `/models`):**
-   * **Visual Guide:** See the exact physical location of all M.2 slots from the official ASUS manual:
+   * **Annotated Motherboard Placement Guide (Red Box Target):**
+     Consult the visual guide below where the exact target slot is highlighted with a **BOLD RED BOX**:
 
-   ![ASUS ROG Crosshair X870E Glacial M.2 Slots Physical Locations](./images/asus_glacial_m2_slots_location.png)
+   ![ASUS ROG Crosshair X870E Glacial NVMe Placement & PCIe Restoration Guide (Red Box Target)](./images/asus_glacial_nvme_placement_annotated.png)
+
+   * **Physical Slot Identification (Under Magnetic Cover 3):**
+     When you open your PC case and look between the two graphics cards, refer to this detailed close-up:
+
+   ![ASUS ROG Crosshair X870E Glacial M.2 Hardware Installation Close-up (Red Box Target)](./images/asus_glacial_nvme_slot_detail_annotated.png)
 
    * **Step-by-Step Procedure:**
      1. **Keep `M.2_1` untouched:** NVMe 0 stays in `M.2_1` (located directly above the top graphics slot, dedicated CPU Gen 5 x4 at 14 GB/s).
-     2. **Access Central M.2 Armor:** Gently pull off **Magnetic Cover 3** located beneath the top graphics card:
+     2. **Access Central M.2 Armor:** Gently pull off **Magnetic Cover 3** located beneath the top graphics card (GPU 0):
 
-     ![ASUS ROG Crosshair X870E Glacial Magnetic Cover 3 Revealing M.2_2 and M.2_3](./images/asus_glacial_m2_heatsink_and_slots_cover.png)
+     ![ASUS ROG Crosshair X870E Glacial Magnetic Cover 3 Revealing M.2_2 and M.2_3 (Original Manual Diagram)](./images/asus_glacial_m2_heatsink_and_slots_cover_original.png)
 
-     3. **Remove NVMe 1 from `M.2_2`:** Unscrew and remove NVMe 1 from slot `M.2_2` (top/left slot). **Leave `M.2_2` completely empty to release all CPU graphics lanes!**
-     4. **Install NVMe 1 into `M.2_3` (or `Q-DIMM.2`):**
-        * **Option A:** Install into `M.2_3` (bottom/right slot under the same heatsink, driven by the AMD Chipset at PCIe 4.0 x4 = ~7.5 GB/s).
-        * **Option B:** Install into the bundled **ROG Q-DIMM.2 module** (`DIMM.2_1`) inserted into the vertical slot next to the DDR5 RAM:
+     3. **Remove NVMe 1 from `M.2_2`:** Press the M.2 Q-Release latch to remove the aluminum heatsink. If NVMe 1 is currently in the **LEFT slot (`M.2_2`)**, release the Q-Latch and remove the SSD. **LEAVE `M.2_2` COMPLETELY EMPTY** to release CPU graphics lanes and un-throttle USB4!
+     4. **Install NVMe 1 into the RED BOX Target (`M.2_3`):**
+        * **Option A (Recommended — Red Box Target):** Install into **`M.2_3` (the RIGHT slot)** under the heatsink. This slot is connected directly to the AMD X870E Chipset at dedicated PCIe 4.0 x4 (~8.0 GB/s) with **zero CPU lane sharing**. Secure the SSD with the tool-less M.2 Q-Latch and replace the heatsink and Magnetic Cover 3.
+        * **Option B (Alternative — Vertical Riser):** Install into the bundled **ROG Q-DIMM.2 module** (`DIMM.2_1`) inserted into the vertical slot next to the DDR5 RAM:
 
-        ![ASUS ROG Q-DIMM.2 Riser Module Installation](./images/asus_glacial_rog_q_dimm2_installation.png)
+        ![ASUS ROG Q-DIMM.2 Riser Module Installation (Original Manual Diagram)](./images/asus_glacial_rog_q_dimm2_installation_original.png)
 
    * *Critical Result:* Slot `M.2_2` is now completely empty, releasing all CPU graphics lanes for full x8/x8 bifurcation!
 

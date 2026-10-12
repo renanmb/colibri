@@ -215,28 +215,36 @@ According to the official **ASUS ROG Crosshair X870E Glacial User Manual**:
 
 ---
 
-### 3.3 Visual Guide: Locating and Accessing the M.2 Storage Slots
+### 3.3 Visual Guide: Locating and Accessing the M.2 Storage Slots (Red Box Target Guide)
 
-Below is the official ASUS diagram showing the physical positions of the M.2 sockets on the motherboard PCB:
+Below is the annotated motherboard architecture map highlighting the **RED BOX TARGET** for installing NVMe 1:
 
-![ASUS ROG Crosshair X870E Glacial M.2 Slots Physical Locations](./images/asus_glacial_m2_slots_location.png)
+![ASUS ROG Crosshair X870E Glacial NVMe Placement & PCIe Restoration Guide (Red Box Target)](./images/asus_glacial_nvme_placement_annotated.png)
+
+When inspecting the physical motherboard beneath Magnetic Cover 3, refer to the high-definition close-up below:
+
+![ASUS ROG Crosshair X870E Glacial M.2 Hardware Installation Close-up (Red Box Target)](./images/asus_glacial_nvme_slot_detail_annotated.png)
+
+Below is the original ASUS diagram showing the physical positions of the M.2 sockets on the motherboard PCB:
+
+![ASUS ROG Crosshair X870E Glacial M.2 Slots Physical Locations (Original Manual Diagram)](./images/asus_glacial_m2_slots_location_original.png)
 
 1. **`M.2_1(SOCKET3)` (Top Slot — CPU Gen 5 x4):**
    * Located directly above the top graphics card (`PCIEX16(G5)_1`), right under the CPU socket.
    * Dedicated CPU PCIe 5.0 x4 connection (14 GB/s).
    * **Keep NVMe 0 (`/workspaces/colibri`) here! Do not touch.**
 
-2. **`M.2_2(SOCKET3)` & `M.2_3(SOCKET3)` (Central Armor Section):**
+2. **`M.2_2(SOCKET3)` & `M.2_3(SOCKET3)` (Central Armor Section Under Magnetic Cover 3):**
    * Located directly beneath the top graphics card (`PCIEX16(G5)_1`), covered by **Magnetic Cover 3**:
 
-![ASUS ROG Crosshair X870E Glacial Magnetic Cover 3 Revealing M.2_2 and M.2_3](./images/asus_glacial_m2_heatsink_and_slots_cover.png)
+![ASUS ROG Crosshair X870E Glacial Magnetic Cover 3 Revealing M.2_2 and M.2_3 (Original Manual Diagram)](./images/asus_glacial_m2_heatsink_and_slots_cover_original.png)
 
    * **Step-by-Step Access:**
      1. Gently pull off **Magnetic Cover 3** (it is held by magnets).
-     2. Press the M.2 Q-Release latch to remove the aluminum heatsink cover.
+     2. Press the M.2 Q-Release latch downwards to release and remove the aluminum heatsink cover.
      3. You will see two M.2 slots side by side:
-        * **`M.2_2` (Top/Left):** **Unscrew and remove NVMe 1 from here! Leave it completely EMPTY.**
-        * **`M.2_3` (Bottom/Right):** Connected to the AMD X870E Chipset (PCIe 4.0 x4). **Install NVMe 1 here!**
+        * **`M.2_2` (LEFT SLOT):** **Unscrew and remove NVMe 1 from here! Leave it completely EMPTY** (this un-throttles rear USB4 and releases CPU graphics lanes).
+        * **`M.2_3` (RIGHT SLOT — RED BOX TARGET):** Connected to the AMD X870E Chipset (PCIe 4.0 x4 @ 8.0 GB/s). **Install NVMe 1 here!** Secure it with the tool-less ASUS M.2 Q-Latch.
      4. Click the heatsink cover and magnetic cover back into place.
 
 ---
